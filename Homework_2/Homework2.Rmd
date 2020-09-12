@@ -1,0 +1,198 @@
+---
+title: 'DS 624: Homwork 2 (Forecasting)'
+subtitle: 'Hyndman: 3.1, 3.2, 3.3, 3.8'
+author: 'Donny Lofland'
+data: '09/07/2020'
+output:
+  html_document:
+    theme: cerulean
+    highlight: pygments
+    css: ./lab.css
+    toc: true
+    toc_float: true
+  pdf_document:
+    extra_dependencies: ["geometry", "multicol", "multirow", "xcolor"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+library(fpp2)
+library(ggplot2)
+library(forecast)
+library(timetk)
+library(tidyverse)
+
+```
+
+## Problem 3.1
+
+For the following series, find an appropriate Box-Cox transformation in order to stabilise the variance.
+
+a. `usnetelec`
+
+```{r Problem_3.1a}
+autoplot(usnetelec)
+
+(lambda1 <- BoxCox.lambda(usnetelec))
+autoplot(BoxCox(usnetelec, lambda1))
+```
+
+> We notice in the original plot, there is a slight exponential increase in the values over time.  pplying a `r lambda1` Box Cox transform transforms this to be closer to linear.
+
+b.` usgdp`
+
+```{r Problem_3.1b}
+autoplot(usgdp)
+
+(lambda2 <- BoxCox.lambda(usgdp))
+autoplot(BoxCox(usgdp, lambda2))
+```
+
+> We notice in the original plot, there is again, a slight exponential increase in the values over time.  Applying a `r lambda2` Box Cox transform transforms this to be closer to linear.  In this case the lambda=`r lambda2` is stronger than the earlier transformation with lambda=`r lambda1`
+
+c. `mcopper`
+
+```{r Problem_3.1c}
+autoplot(mcopper)
+
+(lambda3 <- BoxCox.lambda(mcopper))
+autoplot(BoxCox(mcopper, lambda3))
+```
+
+> This data presents a challenge.  While we see a general linear trend up to the mid-1990s, there is then a drop followed by an unusally high peak.  While we can do a Box Cox transform to more generally tranform this to a linear trend, I'm not confident that the resulting transformation account for the drop and peak.  This is a situation where we would what to better understand any domain specific knowledge to help us understand what happened (qualitatively) between 1998~2008.  If the peak is an outlier and we expect a reversion to mean, that's a very different story than if the peak is real and represents an actual change in the tragectory. The automated Box Cox lambda was `r lambda3`
+
+d. `enplanements`
+
+```{r Problem_3.1d}
+autoplot(enplanements)
+
+(lambda4 <- BoxCox.lambda(enplanements))
+autoplot(BoxCox(enplanements, lambda4))
+```
+
+> Here, our Box Cox transform, lambda=`r lambda4` does help scale the seasonal variability so that it's more consistent over the entire time series.  There is still something unusal going on ~2003, but later data points do appear to be returning to expecttion.  There might be a broad cycle occurring ~10 with dips 1982, 1992, but we really need more data to know if that is a cycle or anomoly.
+
+## Problem 3.2 
+
+Why is a Box-Cox transformation unhelpful for the `cangas` data?
+
+```{r Problem_3.2}
+autoplot(cangas)
+
+(lambda5 <- BoxCox.lambda(cangas))
+autoplot(BoxCox(cangas, lambda5))
+```
+
+> Box Cox transforms apply a consistent transform over an entire timeseries.  This works well if the raw data follows a consistent pattern that we are transforming.  Box Cox doesn't handle situations where we need localized scaling only within a region of the time series.  For the cangas dataset, the is an increased seasonal variability 1975~1995, but before and after that range, variability is lower and more consistent.  In this situation, we would want to qualitatively understand why the 1975~1995 data is more variable.  If we are trying to build a model to help with forecasting, maybe 1975~1995 was an unusual sitation we can disregard, or possibly a black swan, or maybe represents a large cycle which we might need to know about for future projections.  Notice also that the within year seasonality is very differnt in the first third of the graph versus the last third.  We went from smooth within year cycles (with one main peak) to very dunamic within year cycles with a number of peaks.  For what it's worth, the automatic Box Cox found lambda at `r lambda5`
+
+## Problem 3.3 
+
+### Load /Explore Data
+
+```{r Problem_3.3}
+retaildata <- readxl::read_excel("retail.xlsx", skip=1)
+myts <- ts(retaildata[,"A3349873A"], frequency=12, start=c(1982,4))
+
+autoplot(myts)
+ggseasonplot(myts)
+ggsubseriesplot(myts)
+gglagplot(myts)
+ggAcf(myts)
+```
+
+What Box-Cox transformation would you select for your retail data (from Exercise 3 in Section 2.10)?
+
+### BoxCox
+
+```{r}
+lambda <- BoxCox.lambda(myts)
+autoplot(BoxCox(myts, lambda))
+```
+
+> We apply a BoxCox with lambda 0.127.  This helps normalize the increased variability over time.  Note in the original data, as time increased, the range from the low to high values also increased.  A lambda of `r lambda` yields a power transformation, but note lambda is close to 0 (logarithm transform).
+
+## Problem 3.8
+
+For your retail time series (from Exercise 3 in Section 2.10):
+
+a. Split the data into two parts using
+
+```{r Problem_3.8a}
+myts.train <- window(myts, end=c(2010,12))
+myts.test <- window(myts, start=2011)
+```
+
+b. Check that your data have been split appropriately by producing the following plot.
+
+```{r Problem_3.8b}
+autoplot(myts) +
+  autolayer(myts.train, series="Training") +
+  autolayer(myts.test, series="Test")
+```
+
+c. Calculate forecasts using snaive applied to `myts.train`.
+
+```{r Problem_3.8c}
+fc <- snaive(myts.train)
+```
+
+d. Compare the accuracy of your forecasts against the actual values stored in `myts.test`.
+
+```{r Problem_3.8d}
+(results <- accuracy(fc, myts.test))
+```
+
+e. Check the residuals.
+
+```{r Problem_3.8e}
+checkresiduals(fc)
+```
+
+Do the residuals appear to be uncorrelated and normally distributed?
+
+> While the residuals are normally distributed, residuals DO have strong correlations and patterns with surrounding residual values.  We see this pattern clearly in the ACF plot.  Ideally, Lag values would be randomly positive or negative without lconsistent patterns.  The patterns suggest our model has NOT accouned for and removed all seasonal or cyclic patterns leaving patterns in the residuals. 
+
+f. How sensitive are the accuracy measures to the training/test split?
+
+```{r Problem_3.8f}
+# Lets create different train/test splits to see how accuracy really varies
+x <- 1999:2012
+accur_train <- list()
+accur_test <- list()
+i <- 1
+
+for (year in x) {
+  myts.train <- window(myts, end=c(year,12))
+  myts.test <- window(myts, start=year+1)
+
+#  p <- autoplot(myts) +
+#    autolayer(myts.train, series="Training") +
+#    autolayer(myts.test, series="Test")
+
+#  print(p)
+  
+  fc <- snaive(myts.train)
+
+  res <- accuracy(fc, myts.test)
+  accur_train[[i]] <- res[1,2]
+  accur_test[[i]] <- res[2,2]
+
+  i <- i + 1
+}
+
+# Combine RMSE into a dataframe for convenience
+df <- do.call(rbind, Map(data.frame, Year=x, RMSE_Train=accur_train, RMSE_Test=accur_test))
+df <- df %>% 
+  select(Year, RMSE_Train, RMSE_Test) %>%
+  gather(key='Group', value='RMSE', -Year)
+
+# Plot RMSE for training and test data based on where we cut
+ggplot(df, aes(x=Year, y=RMSE)) + 
+  geom_line(aes(color=Group, linetype=Group)) +
+  scale_color_manual(values=c('darkred', 'steelblue'))
+
+```
+> Conceptually, the more training data a model sees, the more it can learn about patterns, but at the cost of possibly becoming over fit.  If we have insufficient traiing data, the model may not see enough to identify patterns.  Since we have a limited dataset, the more training data, the less available as a holdout for the test set.  Generally we like to use 70~80% for training and hold out 20-30% for test.  This is usually a reasonable balance. `Year` is the cut point between training and test data.  In the original model above (see 3.8a), we set the training to be up through 2010 and started test with 2011.  This chart show the RMSE as a function of where we placed the training/test split.  A lower RMSE suggests a better model with less error.  We always expect the error for the training data to be lower than for test data, since the model has seen the training data.  Again, we want the largest training set while retaining good RMSE for both the training and test sets.  Looking at the chart, 2005~2006 is probably a good cut point with test RMSE ~20.  This suggests that the model learned sufficiently to forecast test set values.  Note that cutting at 2005~2006 also means there was more test data that needed to be forecast and the model did quite well.  Cutting ay 2008+ leads to higher RMSE of the test data, suggesting probale overfitting.
