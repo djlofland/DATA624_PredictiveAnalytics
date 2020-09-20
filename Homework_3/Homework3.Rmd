@@ -1,0 +1,123 @@
+---
+title: 'DS 624: Homwork 3 (TS Decomposition)'
+subtitle: 'Hyndman: 6.2, 6.3'
+author: 'Donny Lofland'
+data: '09/17/2020'
+output:
+  html_document:
+    theme: cerulean
+    highlight: pygments
+    css: ./lab.css
+    toc: true
+    toc_float: true
+  pdf_document:
+    extra_dependencies: ["geometry", "multicol", "multirow", "xcolor"]
+---
+
+# DS624 Homework 3
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+library(fpp2)
+library(ggplot2)
+library(forecast)
+library(timetk)
+library(tidyverse)
+library(seasonal)
+```
+
+## Problem 6.2
+
+The plastics data set consists of the monthly sales (in thousands) of product A for a plastics manufacturer for five years.
+
+a. Plot the time series of sales of product A. Can you identify seasonal fluctuations and/or a trend-cycle?
+
+```{r Problem_6.2a}
+
+autoplot(plastics, xlab="Time (year)", ylab = 'Monthly Sales (thousands)')
+
+```
+
+> Overall there is a yearly cycle with the peak ~Q3 and the trough at ~Jan/Feb after christmas.  Overall there is an increasing trend in sales, so business must bee good :) 
+
+b. Use a classical multiplicative decomposition to calculate the trend-cycle and seasonal indices.
+
+```{r Problem_6.2b}
+
+fit <- plastics %>% decompose(type='multiplicative')
+
+autoplot(fit)  
+```
+
+>
+
+c. Do the results support the graphical interpretation from part a?
+
+> Yes, the trend is now mesurable and the seasonal pattern mathes the visual inspection from part A (ie yearly cycles).  Note that the residuals show a cyclic pattern suggesting that there is additional variability not captured by trend or seasons.  This may be year of year variability, but it shows cyclic patterns suggesting a more robust decomposition might be necessary.
+
+d. Compute and plot the seasonally adjusted data.
+
+```{r Problem_6.2d}
+autoplot(fit$x / fit$seasonal)
+```
+
+> Seasonall Adjusted data is $y_t - S_t$, ie the original data minus the seasonal componente.
+
+e. Change one observation to be an outlier (e.g., add 500 to one observation), and recompute the seasonally adjusted data. What is the effect of the outlier?
+
+```{r Problem_6.2e}
+plastics2 <- plastics
+plastics2[14] <- plastics2[14] + 500
+
+fit2 <- plastics2 %>% decompose(type='multiplicative')
+
+autoplot(fit2)
+autoplot(fit2$x / fit2$seasonal)
+```
+
+> The larger outlier in a single year caused the yearly seasonal pattern to now have a noticable bump.  However, in most years we don't have this outlier, so the residuals for every year are off as the decompse attempts to offset the incorrect seasonal pattern.  For the seasonal pattern, decop tries to create an average year over the entire timeseries.  This smooths effects, but doesn't account for odd spikes large enough to be leverage points in the overall average.  We only have 5 years here ... if we have 50 year, the outlier spike might have been smoothed enough to not be a notiable in future years and we would have only seen the large residual for the outlier time point. 
+
+f. Does it make any difference if the outlier is near the end rather than in the middle of the time series?
+
+```{r Problem_6.2f}
+plastics3 <- plastics
+plastics3[14] <- plastics3[-1] + 500
+
+fit3 <- plastics3 %>% decompose(type='multiplicative')
+
+autoplot(fit3)
+autoplot(fit3$x / fit2$seasonal)
+```
+
+> No as the decomposition algorithm overages over all years, it's not like a standard linear regression where the location of the otlier influences where it is a lever.
+
+## Problem 6.3
+
+Recall your retail time series data (from Exercise 3 in Section 2.10). Decompose the series using X11. Does it reveal any outliers, or unusual features that you had not noticed previously?
+
+> According to FPP2, Section 12.9: "Outliers are observations that are very different from the majority of the observations in the time series. They may be errors, or they may simply be unusual."
+
+```{r Problem_6.3}
+retaildata <- readxl::read_excel("retail.xlsx", skip=1)
+myts <- ts(retaildata[,"A3349873A"], frequency=12, start=c(1982,4))
+
+autoplot(myts)
+
+fit_x11 <- myts %>% seas(x11="")
+
+autoplot(fit_x11) +
+  ggtitle("X11 decomposition of AU Retail (A3349873A)")
+
+fit_str <- myts %>% decompose(type='multiplicative')
+
+(outlier_indices <- tsoutliers(myts))
+
+autoplot(fit_str) +
+  ggtitle("DTR decomposition of AU Retail (A3349873A)")
+  
+```
+
+> We can see candidate outlier points at datapoins: 81 189 237 345 356 368 380.  Since this is multiplicative, not additive, it's harder to assess the low outliers compared with the high outliers as the remanied is technically compressed less than one.  X11 drew more attention to outliers near 1988, 1994, and 2001, while the original STR drew more attention (via residuals) to ~2012`2013.
