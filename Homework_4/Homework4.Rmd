@@ -14,7 +14,8 @@ output:
     extra_dependencies: ["geometry", "multicol", "multirow", "xcolor"]
 ---
 
-Source Code: 
+Source Code: [https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Homework_4](https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Homework_4)
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
