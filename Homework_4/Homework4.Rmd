@@ -1,0 +1,215 @@
+---
+title: 'DS 624: Homwork 4 (Data Processesing & Overfitting)'
+subtitle: 'Kuhn: 3.1, 3.2'
+author: 'Donny Lofland'
+data: '09/26/2020'
+output:
+  html_document:
+    theme: cerulean
+    highlight: pygments
+    css: ./lab.css
+    toc: true
+    toc_float: true
+  pdf_document:
+    extra_dependencies: ["geometry", "multicol", "multirow", "xcolor"]
+---
+
+Source Code: 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+library(fpp2)
+library(ggplot2)
+library(forecast)
+library(timetk)
+library(tidyverse)
+library(seasonal)
+library(mlbench)
+library(caret)
+library(corrplot)
+library(RColorBrewer)
+library(AppliedPredictiveModeling)
+library(e1071)
+library(lattice)
+library(hablar)
+library(naniar)
+```
+
+## Problem 3.1
+
+The UC Irvine Machine Learning Repository6 contains a data set related
+to glass identification. The data consist of 214 glass samples labeled as one
+of seven class categories. There are nine predictors, including the refractive
+index and percentages of eight elements: Na, Mg, Al, Si, K, Ca, Ba, and Fe.
+
+The data can be accessed via:
+
+```
+> library(mlbench)
+> data(Glass)
+> str(Glass)
+
+'data.frame': 214 obs. of 10 variables:
+$ RI : num 1.52 1.52 1.52 1.52 1.52 ...
+$ Na : num 13.6 13.9 13.5 13.2 13.3 ...
+$ Mg : num 4.49 3.6 3.55 3.69 3.62 3.61 3.6 3.61 3.58 3.6 ...
+$ Al : num 1.1 1.36 1.54 1.29 1.24 1.62 1.14 1.05 1.37 1.36 ...
+$ Si : num 71.8 72.7 73 72.6 73.1 ...
+$ K : num 0.06 0.48 0.39 0.57 0.55 0.64 0.58 0.57 0.56 0.57 ...
+$ Ca : num 8.75 7.83 7.78 8.22 8.07 8.07 8.17 8.24 8.3 8.4 ...
+$ Ba : num 0 0 0 0 0 0 0 0 0 0 ...
+$ Fe : num 0 0 0 0 0 0.26 0 0 0 0.11 ...
+$ Type: Factor w/ 6 levels "1","2","3","5",..: 1 1 1 1 1 1 1 1 1 1 ...
+```
+
+a. Using visualizations, explore the predictor variables to understand their
+distributions as well as the relationships between predictors.
+
+```{r Problem_3.1a}
+data(Glass)
+
+# Display summary statistics
+summary(Glass)
+
+# Prepare data for ggplot (remove the Target 'Type' column)
+feature_df <- Glass %>% 
+  select(-Type)
+
+feature_gather_df <- feature_df %>% 
+  gather(key = 'variable', value = 'value')
+
+# Histogram plots of each variable
+ggplot(feature_gather_df) + 
+  geom_histogram(aes(x=value, y = ..density..), bins=30) + 
+  geom_density(aes(x=value), color='blue') +
+  facet_wrap(. ~variable, scales='free', ncol=4)
+
+# Skewness for each Predictor
+(skewValues <- apply(feature_df, 2, skewness))
+
+# Boxplots for each variable
+ggplot(feature_gather_df, aes(variable, value)) + 
+  geom_boxplot() + 
+  facet_wrap(. ~variable, scales='free', ncol=6)
+
+# Identify missing data by Feature and display percent breakout
+missing <- colSums(Glass %>% sapply(is.na))
+missing_pct <- round(missing / nrow(Glass) * 100, 2)
+stack(sort(missing_pct, decreasing = TRUE))
+
+# Calculate and plot the Multicolinearity
+correlation <- cor(Glass[,1:ncol(Glass) - 1], use = 'pairwise.complete.obs')
+
+corrplot(correlation, 'ellipse', type = 'lower', order = 'hclust',
+         col=brewer.pal(n=8, name="RdYlBu"))
+
+# Plot scatter plots of each variable versus the target variable
+featurePlot(Glass[,1:ncol(Glass)-1], Glass[,ncol(Glass)], pch = 20)
+```
+
+> See discussion below
+
+b. Do there appear to be any outliers in the data? Are any predictors skewed?
+
+There appear to be outliers in essentailly all the features and all are skewed to some level.  Several predictors have a large number of 0 values, which I will assume isn't measurement error but rather lack of that atom in the glass type.  There is a question whether to treat 0 values as "outliers" since those are probably real measurements with intrinsic value.  Mg is the only element without statistical outliers.  From the correlation plots, we see that Si and Rl have a somewhat strong negative correlation and Ca nad RL have a more significant positive correlation.  Mg has a somewhat negative correlation with several elements: Al, Ba, Ba and Ca, but it is a weak correlation.  
+
+c. Are there any relevant transformations of one or more predictors that
+might improve the classification model?
+
+Interestingly, several predictor show bimodal distributions (see Mg, Na, Rl, K) - in a model advanced model, we might leverage `mixtools` package to see if we can tease out the underlying pattern and explore whether adding a classification feature along with 2 more normal distributions rather than a combined bimodal would give better model performance.  As a strategy, I would probably run all the features through an exploratory BoxCox transformation to see what suggestions it provides and compare the transformed data against raw (visually and in a model - check both model performance and quality of residuals).  Of all the features, Ca, Na and Si are closest to a normal shape.  Ba ans Fe are interesting as they almost appear more like discrete values at specific step and less continuous than other elements.  This could be an artifact of measurement or maybe an intended aspect of glass making that a domain expert could shed light on.  Once "normalized" (or as close as we can get), we could also attempt scaling and centering and assess whether that gives any/all of the predictors more resolving power when used in a model, i.e. convert the predictor to a z-score.  Ultimately we are looking for the most well behaved data in our model, not perfect.
+
+While the chapter discusses PCA, we need to carefully consider whether predictive power or model explanatory value is more important.  PCA can often handle problems with multicolinearity and reduce dimensionality in our feature space, however, at the cost of explainable features.  I generally avoid PCA if I expect someone to ask me how features are related to predictions.  This is certainly true during early model exploration.  Once all stakeholders have confidence with a model, then PCA can be layered in to tweak out further performance.  That said, the moment I'm reaching for PCA, I'll probably more likely to explore other modeling approaches that are insensitive to multicolinearity and/or larger feature sets.  For example, Neural Networks can often handle these more robustly.
+
+## Problem 3.2
+
+The soybean data can also be found at the UC Irvine Machine Learning
+Repository. Data were collected to predict disease in 683 soybeans. The 35
+predictors are mostly categorical and include information on the environmental
+conditions (e.g., temperature, precipitation) and plant conditions (e.g., left
+spots, mold growth). The outcome labels consist of 19 distinct classes.
+
+The data can be loaded via:
+
+```
+> library(mlbench)
+> data(Soybean)
+> ## See ?Soybean for details
+```
+
+a. Investigate the frequency distributions for the categorical predictors. Are
+any of the distributions degenerate in the ways discussed earlier in this
+chapter?
+
+> Note that according to [http://search.r-project.org/library/mlbench/html/Soybean.html](http://search.r-project.org/library/mlbench/html/Soybean.html), all the features are categorical.
+
+```{r Problem3.2a, fig.width=8, fig.height=8}
+data(Soybean)
+
+# Display summary statistics
+summary(Soybean)
+
+Soybean %>%
+  ggplot(aes(x=Class)) + 
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 90))
+
+# Make sure all features are categorical
+feature_df <- as_tibble(Soybean) %>%
+  convert(fct())
+
+# Prepare data for ggplot (remove the Target 'Class' column)
+feature_gather_df <- feature_df %>% 
+  select(-Class) %>%
+  gather(key = 'variable', value = 'value')
+
+# Histogram plots of each variable
+ggplot(data=feature_gather_df, aes(x=value)) + 
+  geom_bar() +
+  facet_wrap(variable~., ncol=4)
+
+```
+
+Since all the features are by definition categorical, we don't expect outliers per se as those have been coded.  However, with this dataset, we do see a significant number of missing values which can be problematic, especially if we have smaller data sets.  The question is whether missing values are meaningful - were these points miss-coded or missing, or does the fact they are missing hold meaning such that we should code those in a meaningful way.  This comes down to domain expertise.  Common approaches are to drop a feature if it has too many missing values as it probably offers less explanatory values.  Another approaches, esp with continuous variables, is imputing with a class mean or median.  However, with categorical features, this can be more challenging.  If we have an ordered categorical, we might imput with the middle, but that may or may not be the correct solution.  The book suggests impute.knn() which will look for other observations with similar non-NA features and impute the missing value based on the other rows.  This is probably a reasonable approach with this dataset.  We should also consider any features that have very little variance - these may offer less resolution for a model.  We ideally want features with higher variance so we get better resolution power from that variable.
+
+Alternatively, if a specific row (observation) has too many NAs, we might drop that row.  The aggressive approach is to drop any row or column with NAs; however, we could be throwing away valuable information a model could use.
+
+Looking at specific features, we also see class imbalances (e.g., seed.discolor has 513 zeros and 64 ones).  Class imbalances might possible reduce resolution of our model by inflating the importance of our dominant class.  Different models are more/less sensitive to class imbalances, but it's certainly a consideration.
+
+Looking at the count of observations for each class, we have some clear imbalances present in the data.
+
+b. Roughly 18% of the data are missing. Are there particular predictors that
+are more likely to be missing? Is the pattern of missing data related to
+the classes?
+
+```{r Problem3.2b}
+
+vis_miss(Soybean)
+
+Soybean %>% 
+  select(-Class) %>% 
+  gg_miss_var()
+
+gg_miss_upset(Soybean, 
+              nsets = 15,
+              nintersects = NA)
+
+missing <- Soybean %>%
+  group_by(Class) %>%
+  miss_var_summary()
+
+ggplot(missing, aes(Class, variable, fill=pct_miss)) + 
+  geom_tile() +
+  theme(axis.text.x = element_text(angle = 90)) 
+```
+
+Using the `naniar` package we can quickly see patterns with the missing data.  Most of the missing data are associated with the 5 classes: 2-4-d-injury, cyst-nematode, diaporthe-pod, herbicide-injury and phytophthora-rot.  From the interaction plot (see above), we can see patterns with missing data across the features (note, I truncated this plot to only show more common interactions). Comparing with the bar chart showing observations by class, the missing data is more prevalent in our less represented classes.
+
+c. Develop a strategy for handling missing data, either by eliminating
+predictors or imputation.
+
++ Before imputing, I would explore bootstrapping (up-sample or down-sample) to deal with class imbalances.  The problem is that imputing based on imbalanced data will likely lead to incorrect class assignment by a trained model and lowered resolution.
++ Since we are working with categorical data, the only features where we could consider mean or median imputation or ordinal categorical; however, we need to assess any imbalances within each of those features before blindly using a mean or median.  The safer approach with categorical is to use KNN which will look for similar observations based on other features to choose a value.  `date` for example is the month and we could possible replace a missing `date` with the median `date`, though mean might be ok.
++ I would then do an exploratory model with knn imputed values and step-wise remove the features with the most missing data (e.g. sever, seed.tmt, etc), as imputed values are inherently less trustworthy, and see how model performance changes.  As long as performance remains the same or improves, I would leave out those features.
++ With exploratory models, I would next assess predictive accuracy for those classes that started with the most missing data (e.g. 2-4-d-injury).  These may be problematic as they are also the classes with fewer observations.
