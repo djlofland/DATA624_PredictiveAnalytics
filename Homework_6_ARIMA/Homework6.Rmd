@@ -428,14 +428,36 @@ checkresiduals(fit2)
 
 e. Forecast three times ahead. Check your forecasts by hand to make sure that you know how they have been calculated.
 
-$$(1-B)^2 * y_t = (1 + \theta_1*B) * \epsilon_t\\
-(1-2*B+B^2) * y_t = (\eta_t + \theta_1*B*\epsilon_t)\\
-y_t - 2*y_t*B + y_t*B^2 = (\eta_t + \theta_1*B*\epsilon_t)\\
-y_t = 2*y_t*B - y_t*B^2 + \eta_t + \theta_1*B*\epsilon_t\\
-y_t = 2*y_{t-1} - y_{t-2} + \eta_t + \theta_1 * \epsilon_{t-1}\\
-y_{T+1|T} = 2*y_{T} - y_{T-1} + \theta_1 * \epsilon_{T}$$
+Expanding ARIMA(0,2,1):
 
-> I give up ... sorry - calculating by hand isn't going well and I need to move on.  Note: I did spend quite a bit of time trying to fingure this out!  I don't know how to get $\epsilon_T$.   I know $\theta$ from the model (-0.8995) and the last observed value in the series is `r wmurders[54]`.  
+$$(1-B)^2 * y_t = \epsilon_t + \epsilon_t * \theta_1*B$$
+
+Algebra:
+
+$$y_t - 2*B*y_t + y_t*B^2 = \epsilon_t + \epsilon_t * \theta_1*B $$
+
+Expand backshift:
+
+$$y_t - 2*y_{t-1} + y_{-2} = \epsilon_t + \epsilon_{t-1} * \theta_1 $$
+Rearrange and $\epsilon_t=0$, $\theta=-0.8995$:
+
+$$y_t = 2*y_{t-1} - y_{t-2} + -0.8995 * \epsilon_{t-1}$$
+
+```{r Problem_8.7e}
+tail(wmurders, 2)
+tail(residuals(fit2), 1)
+
+y_2003 <- 2.662227
+y_2004 <- 2.589383
+y_2005 = 2 * y_2004 - y_2003 + -0.8995 * 0.01384333
+y_2006 = 2 * y_2005 - y_2004 + -0.8995 * 0
+y_2007 = 2 * y_2006 - y_2005 + -0.8995 * 0
+print(paste(y_2005, y_2006, y_2007))
+
+fit2 %>% forecast(h=3)
+```
+
+> The manual calculations seem to match R's forecast() pretty well :)
 
 f. Create a plot of the series with forecasts and prediction intervals for the next three periods shown.
 
