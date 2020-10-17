@@ -1,0 +1,449 @@
+---
+title: 'DS 624: Homwork 6 (Exponential Smoothing)'
+subtitle: 'Hyndman: 8.1, 8.2, 8.3, 8.5, 8.6, 8.7'
+author: 'Donny Lofland'
+data: '10/17/2020'
+output:
+  html_document:
+    theme: cerulean
+    highlight: pygments
+    css: ./lab.css
+    toc: true
+    toc_float: true
+  pdf_document:
+    extra_dependencies: ["geometry", "multicol", "multirow", "xcolor"]
+---
+
+Source Code: [https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Homework_6](https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Homework_6)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+library(fpp2)
+library(ggplot2)
+library(tseries)
+library(gridExtra)
+library(forecast)
+library(timetk)
+library(tidyverse)
+library(seasonal)
+library(mlbench)
+library(caret)
+library(corrplot)
+library(RColorBrewer)
+library(AppliedPredictiveModeling)
+library(e1071)
+library(lattice)
+library(hablar)
+library(naniar)
+```
+
+## Problem 8.1
+
+Figure 8.31 shows the ACFs for 36 random numbers, 360 random numbers and 1,000 random numbers.
+
+a. Explain the differences among these figures. Do they all indicate that the data are white noise?
+
+![Problem 8.1 ACF Graphs](./wnacfplus-1.png)
+
+> ACF looks for correlations between values in a sequence. It's intended to be used with timeseries data where there is an assumption that some value is changing over time.  To calculate a given lag value for $N$, the algorithm goes back thru all the list of values and picks out every $Nth$ value and does a correlation analysis.  With fewer values in the list, we see a stronger correlation (random chance).  As the number of vlaues in the list increase, when calculating the correlation, we are reverting to a mean where there should be 0 correlation (since we are drawing random numbers).  With only 36 values, we are more likely to see spurious correleations, but as we tend to 1000 values, spurious correlations smooth out and are less likely to be noted as possibly significant. 
+
+>  The more historic data we provide, the more likely we will find real lag correlations.  The less histoic data we provide, the greater the chance we find correlations we cannot trust.  
+
+> For smaller lags, $N$, we have more values (e.g. $N=2$ and 36 numbers, we have 18 lag values) and are less likely to see a significant correlation.  As $N$ increases, (e.e. $N=15$ and 36 numbers, we have 2 lag values), the chance for spurios correlations increases - true for both white noise and real timeseries data.
+
+b. Why are the critical values at different distances from the mean of zero? Why are the autocorrelations different in each figure when they each refer to white noise?
+
+> With fewer random numbers in our "timeseries", each calculated lag value has fewer datapoints when calculating the correlation and the greater the chance that lag value appears correlated.  With greater numbers of lag values in the correlation formula, the correlation revert to mean of 0.  Each figure has different autocorrelation merely due to chance and how the random numbers happened to align.
+
+## Problem 8.2
+
+A classic example of a non-stationary series is the daily closing IBM stock price series (data set `ibmclose`). Use R to plot the daily closing prices for IBM stock and the ACF and PACF. Explain how each plot shows that the series is non-stationary and should be differenced.
+
+```{r Problem_8.2}
+autoplot(ibmclose)
+ggAcf(ibmclose)
+ggPacf(ibmclose)
+```
+
+> The ACF plot shows clear correlation between each value, $y_t$ and it's lags, $y_{t-k}$ (where $k=1...n$).  This makes sense as we would expect a stick value on any given day to be realted to its value the day before.  Since $y_t ~ y_{t-1}$ and $y_{t-1} ~ y_{t-2}$, etc ... the ACF shows how the current value $y_t$ is in fact correlated with every since lag going back in time.  When we look at the partial acf (PACF), we remove this chain and roll up the rollling effect to a given day $y_t$.  Now we can see that the closing stock price is significantly related to the closing stock price at $y_{t-1}, but not significantly affected by prices in days before that.  Before starting an analysis like this, its helpful to establish some hypotheses to help us qualitatively assess whther any "significant" correlations we see might be real or if random chance might be peeking thru.  For stocks, I might guess that they are related to the day before and maybe price at open on Monday morning (weekly) and maybe based on quarterly earnings reported each quarter.  With this prior, whn I review the pACF, if I saw significant correlations at 5 days (assuming a business week), 7 days assuming a calendar week, or 90 day (assuming a quarter) - I might treat those as real.  IF I saw spikes at any other day, they could be real, but I would need to dig more to understand if and how they should be treated.
+
+## Problem 8.3
+
+For the following series, find an appropriate Box-Cox transformation and order of differencing in order to obtain stationary data.
+
+```{r Problem_8.3}
+
+#' Print common ACF plots to help determine if stationary
+#'
+#' @param series A time series
+#' @param lambda the Box Cox lambda transform to use
+#' @examples
+#' acf_plots(my_series, 0.5)
+#' @export
+acf_plots <- function(series, lambda) {
+  a1 <- ''
+  a2 <- ''
+  
+  series_bc <- BoxCox(series, lambda)
+
+  p1 <- autoplot(series) + ggtitle('Original Time Series')
+  p2 <- autoplot(series_bc) + ggtitle(paste('Box Cox Transformed Time Series with lambda=',lambda))
+  p3 <- ggAcf(series_bc)
+  p4 <- ggPacf(series_bc)
+
+  grid.arrange(p1, p2, p3, p4, nrow=2)
+
+  series_bc_diff <- diff(series)
+  
+  a1 <- adf.test(series_bc_diff)
+  print(a1)
+  # b1 <- Box.test(series_bc_diff, lag=10, type='Ljung-Box')
+  # print(b1)
+  # k1 <- kpss.test(series_bc_diff, null='Trend')
+  # print(k1)
+  
+  series_bc_diff2 <- diff(series_bc_diff)
+  
+  a2 <- adf.test(series_bc_diff2)
+  print(a2)
+  # b2 <- Box.test(series_bc_diff2, lag=10, type='Ljung-Box')
+  # print(b2)
+  # k2 <- kpss.test(series_bc_diff2, null='Trend')
+  # print(k2)
+
+  p1 <- autoplot(series_bc_diff) + ggtitle('Differencing Order 1')
+  p2 <- autoplot(series_bc_diff2) + ggtitle('Differencing Order 2')
+
+  grid.arrange(p1, p2, nrow=1)
+}
+
+#' Return a properly rounded Box Cox lambda (-n, ..., -1, -0.5, 0, 1, ..., n)
+#'
+#' @param series A time series
+#' @examples
+#' round_lambda(my_series)
+#' @return new_lambda
+#' @export
+round_lambda <- function(series) {
+  lambda <- BoxCox.lambda(series)
+  
+  if ((lambda > 0.25) & (lambda < 0.75)) {
+    new_lambda <- 0.5
+  } else if ((lambda > -0.75) & (lambda < -0.25)) {
+    new_lambda <- -0.5
+  } else {
+    new_lambda <- round(lambda)
+  }
+
+  print(paste('lambda:', lambda, ',  rounded lambda:', new_lambda))
+  
+  return(new_lambda)
+}
+```
+
+a. `usnetelec`
+
+```{r Problem_8.3a}
+series <- usnetelec
+
+lambda <- round_lambda(series)
+acf_plots(series, lambda)
+```
+
+> BoxCox.lambda = `lambda` and order of differencing = 2.  Note that after a single differencing, we still see an upward trend in the plot.  Using Augmented Dickey Fuller, for order 1, we reject that it's stationary and with order 2, we accept that it's stationary.
+
+b. `usgdp`
+
+```{r Problem_8.3b}
+series <- usgdp
+
+lambda <- round_lambda(series)
+acf_plots(series, lambda)
+```
+
+> BoxCox.lambda = `lambda` and order of differencing = 2.  Note that after a single differencing, we still see an upward trend in the plot.  Note that while we see a clear trend (suggesting order 1 is non stationary), the ADF didn't pick this up.
+
+c. `mcopper`
+
+```{r Problem_8.3c}
+series <- mcopper
+
+lambda <- round_lambda(series)
+
+acf_plots(series, lambda)
+```
+
+> BoxCox.lambda = `lambda` and order of differencing = 1 or 2.  Note that after a single differencing, we the plot looks and observe no trend.  After a second differencing (order 2), our values still have a random walk appearance above and below 0.  An order 1 is probably fine.
+
+d. `enplanements`
+
+```{r Problem_8.3d}
+series <- enplanements
+
+lambda <- round_lambda(series)
+
+acf_plots(series, lambda)
+```
+
+> BoxCox.lambda = `lambda` and order of differencing = 1 or 2.  Note that after a single differencing, we the plot looks and observe no trend.  After a second differencing (order 2), our values still have a random walk appearance above and below 0.  An order 1 is probably fine.
+
+e. `visitors`
+
+```{r Problem_8.3e}
+series <- visitors
+
+lambda <- round_lambda(series)
+
+acf_plots(series, lambda)
+```
+
+> BoxCox.lambda = `lambda` and order of differencing = 1 or 2.  Note that after a single differencing, we the plot looks and observe no trend.  After a second differencing (order 2), our values still have a random walk appearance above and below 0.  An order 1 is probably fine.
+
+## Problem 8.5 
+
+For your retail data (from Exercise 3 in Section 2.10), find the appropriate order of differencing (after transformation if necessary) to obtain stationary data.
+
+```{r Problem_8.5}
+retaildata <- readxl::read_excel("retail.xlsx", skip=1)
+series <- ts(retaildata[,"A3349873A"], frequency=12, start=c(1982,4))
+
+lambda <- round_lambda(series)
+acf_plots(series, lambda)
+```
+
+> BoxCox.lambda = `lambda` and order of differencing = 1.  Note that after a single differencing, the plot shows no trend.  ADF seems to confirm this.
+
+## Problem 8.6 
+
+Use R to simulate and plot some data from simple ARIMA models.
+
+a. Use the following R code to generate data from an AR(1) model with $\phi_1=0.6$ and $\sigma^2=1$. The process starts with $y_1=0$. 
+
+```
+y <- ts(numeric(100))
+e <- rnorm(100)
+
+for(i in 2:100)
+  y[i] <- 0.6 * y[i-1] + e[i]
+```
+
+```{r Problem_8.6}
+ar_ts <- function(phi, sigma2) {
+  set.seed(999)
+  y <- ts(numeric(100))
+  e <- rnorm(100, sigma2)
+  
+  for(i in 2:100)
+    y[i] <- phi * y[i-1] + e[i]
+  
+  return(y)
+}
+
+```
+
+```{r Problem_8.6a}
+phi <- 0.6
+sigma2 <- 1
+
+series <- ar_ts(phi, sigma2)
+
+lambda <- round_lambda(series)
+acf_plots(series, lambda)
+```
+
+b. Produce a time plot for the series. How does the plot change as you change $\phi_1$?
+
+```{r Problem_8.6b}
+sigma2 <- 1
+x = seq(1, 100)
+time_plot <- data.frame(x)
+
+names <- c('x')
+i <- 2
+
+for (phi in c(0, 0.1, 0.5, 0.8, 0.9, 0.95, 0.99, 1.0, 1.0)) {
+  names[[i]] <- paste('phi_',phi, sep='')
+  i <- i+1
+  series <- ar_ts(phi, sigma2)
+  time_plot <- cbind(time_plot, series)
+}
+
+colnames(time_plot) <- names
+
+df <- time_plot %>% reshape2::melt(id.var='x')
+ggplot(df, aes(x=x, y=value, col=variable)) + geom_line() + ggtitle('Effect of phi on AR series')
+```
+> We see that as $\phi$ increases towards 1, the variation remains the same, but we've increased the trend to approach x=y
+
+c. Write your own code to generate data from an MA(1) model with $\thetai_1=0.6$ and $\sigma^2=1$?
+
+```{r Problem_8.6c}
+theta <- 0.6
+sigma2 <- 1
+
+ma_ts <- function(theta, sigma2) {
+  set.seed(999)
+  y <- ts(numeric(100))
+  e <- rnorm(100, sigma2)
+  
+  for(i in 2:100)
+    y[i] <- e[i] + theta * e[i-1]
+  
+  return(y)
+}
+
+series <- ma_ts(theta, sigma2)
+autoplot(series)
+```
+
+d. Produce a time plot for the series. How does the plot change as you change $\theta_1$?
+
+```{r Problem_8.6d}
+sigma2 <- 1
+x = seq(1, 100)
+time_plot <- data.frame(x)
+
+names <- c('x')
+i <- 2
+
+for (theta in seq(0, 1.0, 0.1)) {
+  names[[i]] <- paste('theta_',theta, sep='')
+  i <- i+1
+  series <- ma_ts(theta, sigma2)
+  time_plot <- cbind(time_plot, series)
+}
+
+colnames(time_plot) <- names
+
+df <- time_plot %>% reshape2::melt(id.var='x')
+ggplot(df, aes(x=x, y=value, col=variable)) + geom_line() + ggtitle('Effect of theta on MA series')
+```
+
+> As theta increases to 1, the variation increases so that the series is more jagged.
+
+e. Generate data from an ARMA(1,1) model with $\phi_1=0.6$, $\theta_1=0.6$ and $\sigma^2=1$
+
+```{r Problem_8.6e}
+phi <- 0.6
+theta <- 0.6
+sigma2 <- 1
+
+arma_ts <- function(theta, phi, sigma2, c=0) {
+  set.seed(999)
+  y <- ts(numeric(100))
+  e <- rnorm(100, sigma2)
+  
+  for(i in 2:100)
+    y[i] <- phi * y[i-1] + e[i] + theta * e[i-1]
+  
+  return(y)
+}
+
+series <- arma_ts(theta, phi, sigma2)
+autoplot(series)
+```
+
+f. Generate data from an AR(2) model with $\phi_1=-0.8$, $\phi_2=0.3$ and $\sigma^2=1$. (Note that these parameters will give a non-stationary series)
+
+```{r Problem_8.6f}
+phi <- -0.8
+phi2 <- 0.3
+sigma2 <- 1
+
+ar_ts <- function(phi, phi2=0, sigma2, c=0) {
+  set.seed(999)
+  y <- ts(numeric(100))
+  e <- rnorm(100, sigma2)
+  
+  for(i in 3:100)
+    y[i] <- phi * y[i-1] + phi2 * y[i-2] + e[i]
+  
+  return(y)
+}
+
+series <- ar_ts(phi, phi2, sigma2)
+autoplot(series)
+```
+
+g. Graph the latter two series and compare them.
+
+> See above - plots inline with the part e and f
+
+## Problem 8.7
+
+Consider `wmurders`, the number of women murdered each year (per 100,000 standard population) in the United States.
+ 
+a. By studying appropriate graphs of the series in R, find an appropriate ARIMA($p$, $d$, $q$) model for these data.
+
+```{r Problem_8.7a}
+series <- wmurders
+
+lambda <- round_lambda(series) # note, lambda = 0
+acf_plots(wmurders, lambda)
+
+wmurders_diff <- diff(wmurders)
+wmurders_diff2 <- diff(wmurders_diff)
+
+p3 <- ggAcf(wmurders_diff2)
+p4 <- ggPacf(wmurders_diff2)
+
+grid.arrange(p3, p4, nrow=1)
+```
+
+> Differencing with 1 looks ok, but when we difference with 2nd order we get a smaller p-value .  Visually, the graphs look similar so it might be ok to use d=1 or d=2.  I will pick d=2.  Looking at the ACF and PACF for the 2nd order difference, we see a significant spikes at p=1 and p=2 and in the PACF, q=1.  The PACF spike is negative at lag -1 which suggests favoring a MA term over an AR term.  Since the ACF didn't reall how a decaying pattern or sharp positive, I'm less inclined to think we need the AR term.  With this information, we suspect an ARIMA(0,2,1) would be appropriate.  For reference, I've referred to https://people.duke.edu/~rnau/411arim3.htm to help with understanding the AR and MA terms.
+
+```{r Problem_8.7a2}
+(fit1 <- auto.arima(wmurders))
+(fit2 <- Arima(wmurders, order=c(0,2,1)))
+(fit3 <- auto.arima(wmurders, seasonal = FALSE, stepwise = FALSE, approximation = FALSE))
+
+```
+
+b. Should you include a constant in the model? Explain.
+
+```{r Problem_8.7b}
+fit3 %>% forecast(h=10) %>% autoplot(include=80)
+```
+
+> Murders will probably never go to zero (though we wish they would!).  So, a constant, $c\ne0$ is probably necessary.  If we have reason to believe policies or socienty haven't changed, then we'd probably set $d=0$ where the forecast will tend towards the mean of the data.
+
+c. Write this model in terms of the backshift operator.
+
+Assuming my ARIMA (0,2,1), the backshift notation would be:
+
+$$(1-B)^2 * y_t = c + (1 + \theta_1*B) * \epsilon_t$$
+
+> Reference: https://robjhyndman.com/talks/RevolutionR/10-Seasonal-ARIMA.pdf
+
+d. Fit the model using R and examine the residuals. Is the model satisfactory?
+
+```{r Problem_8.7d}
+checkresiduals(fit2)
+```
+
+> Overall, the residuals look reasonable.  Normally distributed, no clear pattern in the residual plot, nor in ACF.  There might be a hint of heteroscedacity, but it's not pronounced.
+
+e. Forecast three times ahead. Check your forecasts by hand to make sure that you know how they have been calculated.
+
+$$(1-B)^2 * y_t = (1 + \theta_1*B) * \epsilon_t\\
+(1-2*B+B^2) * y_t = (\eta_t + \theta_1*B*\epsilon_t)\\
+y_t - 2*y_t*B + y_t*B^2 = (\eta_t + \theta_1*B*\epsilon_t)\\
+y_t = 2*y_t*B - y_t*B^2 + \eta_t + \theta_1*B*\epsilon_t\\
+y_t = 2*y_{t-1} - y_{t-2} + \eta_t + \theta_1 * \epsilon_{t-1}\\
+y_{T+1|T} = 2*y_{T} - y_{T-1} + \theta_1 * \epsilon_{T}$$
+
+> I give up ... sorry - calculating by hand isn't going well and I need to move on.  Note: I did spend quite a bit of time trying to fingure this out!  I don't know how to get $\epsilon_T$.   I know $\theta$ from the model (-0.8995) and the last observed value in the series is `r wmurders[54]`.  
+
+f. Create a plot of the series with forecasts and prediction intervals for the next three periods shown.
+
+```{r Problem_8.7f}
+fit2 %>% forecast(h=3) %>% autoplot
+```
+
+g. Does `auto.arima()` give the same model you have chosen? If not, which model do you think is better?
+
+> My model, ARIMA(0,2,1) had an AIC od -6.48.  auto.arima() arrived at ARIMA(1,2,1) with AIC -6.88 and auto.arima(seasonal = FALSE, stepwise = FALSE, approximation = FALSE) found ARIMA(0,2,3) with AIC -7.54.  The auto.arima() was slightly better than my guess and doing a more exhaustive auto.arima performed slightly better.
+
