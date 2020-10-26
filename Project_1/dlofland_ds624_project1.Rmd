@@ -4,8 +4,6 @@ subtitle: 'DS624 Project 1 (Fall 2020)'
 author: "Donny Lofland"
 date: "10/23/2020"
 output: 
-  pdf_document:
-    extra_dependencies: ["geometry", "multicol", "multirow", "xcolor"]
   html_document:
     code_folding: hide
     theme: cerulean
@@ -13,6 +11,8 @@ output:
     css: ./lab.css
     toc: true
     toc_float: true
+  pdf_document:
+    extra_dependencies: ["geometry", "multicol", "multirow", "xcolor"]
 ---
 
 ```{r setup, include=FALSE}
@@ -921,13 +921,15 @@ data$ds <- seq.POSIXt(st, en, by=as.difftime(c(1), units = "hours"))
 #data$ds <- strftime(data$ds, '%Y-%b')
 
 predictions <- cbind(as.character(data$ds), as.numeric(data$mean))
-colnames(predictions) <- c('Date Time', 'WaterFlow')
+colnames(predictions) <- c('DateTime', 'WaterFlow')
 
 pred_df <- as.data.frame(predictions)
 pred_df$WaterFlow <- as.numeric(pred_df$WaterFlow)
 
 # Append forecast values to end of original dataset
-waterflow_output_df <- rbind(pipes2_ts, pred_df)
+pipes2_df <- data.frame(DateTime=pipes2_tsb$hour, WaterFlow=pipes2_tsb$WaterFlow_tot)
+waterflow_output_df <- rbind(pipes2_df, pred_df)
+colnames(waterflow_output_df) <- c('Date Time', 'WaterFlow')
 
 # Save final dataset with forecasts appended to end
 write.csv(waterflow_output_df, './datasets/waterflow_final.csv')
