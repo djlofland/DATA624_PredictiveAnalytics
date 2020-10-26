@@ -5,6 +5,7 @@ author: "Donny Lofland"
 date: "10/23/2020"
 output: 
   html_document:
+    code_folding: hide
     theme: cerulean
     highlight: pygments
     css: ./lab.css
@@ -15,8 +16,10 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
-
+knitr::opts_chunk$set(
+	message = FALSE,
+	warning = FALSE
+)
 library(fpp2)          # Hyndman's Forecasting Principals and Practice package
 
 # === libraries imported by fpp2 ===
@@ -143,7 +146,7 @@ The data is given in a single file. The variable ‘Cash’ is provided in hundr
 
 ### Load ATM Data
 
-```{r load_data, echo=FALSE}
+```{r load_data}
 # Load the Excel data
 atm_df <- readxl::read_excel('./datasets/ATM624Data.xlsx')
 
@@ -166,7 +169,7 @@ knitr::kable(atm_df[1:10, 1:3],
 
 Let's do a quick plot of the raw data to get a sense for how it look, scale, any issues or trends.
 
-```{r pressure, echo=FALSE, warning=FALSE}
+```{r pressure, warning=FALSE}
 # Plot data for inspection using ggplot.  Note I used a log_scale to handle the huge outlier
 # ggplot(atm_df, aes(x=DATE, y=Cash, color=ATM, group=ATM)) + 
 #  geom_line() +
@@ -197,7 +200,7 @@ Initial takeaways are:
 
 I'm using the `nanair` package to inspect for missing values in the dataset.  As we can see, there are **14 rows** missing both an `ATM` and `Cash` values.  In addition, we have **5 rows** missing `Cash` values.
 
-```{r missing, echo=FALSE, fig.height=3, fig.width=4}
+```{r missing, fig.height=3, fig.width=4}
 # Various NA plots to inspect data
 knitr::kable(miss_var_summary(atm_df), 
              caption = 'Missing Values',
@@ -213,7 +216,7 @@ gg_miss_upset(atm_df)
 
 We have 14 empty rows with a `DATE` and no `ATM` identifier or `Cash` value - these were probably added to illustrate the forecast dates we need to make. I'm going to drop them for now so they don't interfere.  We'll re-add forecast rows later.
 
-```{r drop_na, echo=FALSE}
+```{r drop_na}
 # Drop any row that are missing both ATM and Cash values
 atm_clean_df <- atm_df %>%
   filter(!(is.na(ATM) & is.na(Cash))) %>%
@@ -227,7 +230,7 @@ print(c('Original: ', nrow(atm_df), 'After Drop:', nrow(atm_clean_df)))
 
 We have 5 rows with an `ATM` identifier, but no `Cash` value.  I will impute these values using the `na_kalman()` function from the `imputeTS` package.  Since financial transactions often have weekly cycles, I want to make sure my imputing captures the weekly cycle along with any overall trends.  Note, I knew there was one problematic outlier from the exploratory graph above.  If we had found several outliers, I probably would have moved to a z-score based system to identify all values over +3 standard deviations (only on the high side as low values down to $0 is fine).  I would have then replaced all those outlier values with NA and imputed with the `na_kalman()` below. Note that ATM 3 didn't have any missing values; however, it does have all 0's until the last few days - will handle that problem in a later section.
 
-```{r get_outlier, echo=FALSE}
+```{r get_outlier}
 # Get highest cash value.
 max_cash <- max(atm_clean_df$Cash, na.rm = TRUE)
 max_date <- atm_clean_df %>% 
@@ -239,7 +242,7 @@ atm_clean_df$Cash[atm_clean_df$ATM==max_date$ATM & atm_clean_df$DATE==max_date$D
 
 We have one crazy outlier for `r max_date$ATM` on **`r max_date$DATE`** with a value of **$`r max_date$Cash`**.  Since this doesn't line up on a known holiday that we might need to account for, I'm going to set it to NA and when we impute, we'll replace the outlier with a more reasonable value.
 
-```{r impute_cash, echo=FALSE, fig.height=3, fig.width=4}
+```{r impute_cash, fig.height=3, fig.width=4}
 # Get each unique ATM machine so we can loop over them
 machines <- unique(atm_clean_df$ATM)
 
@@ -282,7 +285,7 @@ So, it appear like ATM 3 is a new machine that was brought online at the end of 
 
 Let's check the cross correlation first.
 
-```{r cross_corr_atms, echo=FALSE, fig.height=3, fig.width=4}
+```{r cross_corr_atms, fig.height=3, fig.width=4}
 atm1 <- atm_impute_df %>% filter(ATM=='ATM1') %>% select(Cash)
 atm2 <- atm_impute_df %>% filter(ATM=='ATM2') %>% select(Cash)
 atm4 <- atm_impute_df %>% filter(ATM=='ATM4') %>% select(Cash)
@@ -313,7 +316,7 @@ While I'm going to use `mean` (main because I want to play with `dtw`), we could
 
 I also round all the values up to the nearest ten dollar amount (i.e. 1 decimal position since `Cash` is in hundreds of dollars).  Most ATM machine only give out \$20 increments, but some older ATM's gave out \$10 increments.  
 
-```{r impute_atm3, echo=FALSE, message=FALSE, warning=FALSE}
+```{r impute_atm3, message=FALSE, warning=FALSE}
 
 # Build data.frame with only ATM 1, 2 and 4 (eliminate ATM 3)
 atm_12_df <- atm_impute_df %>%
@@ -435,7 +438,7 @@ knitr::kable(atm_grp2_df,
 Now we loop through each ATM machine, convert our data to a time series and build a forecasting model. Based on the strong pACF of 7 for each machine, we will do a `diff(7)` for each.   Once we have the model, we'll predict the next 14 days for that machine and add it to our final dataset.
 
 
-```{r model, echo=FALSE}
+```{r model}
 # Get each unique ATM machine so we can loop over them
 machines <- unique(atm_final_df$ATM)
 
@@ -535,7 +538,7 @@ this to your existing files above.
 
 ### Load Data
 
-```{r load_data_B, echo=FALSE, warning=FALSE, message=FALSE}
+```{r load_data_B, warning=FALSE, message=FALSE}
 
 # Load the Excel data
 power_df <- readxl::read_excel('./datasets/ResidentialCustomerForecastLoad-624.xlsx',
@@ -560,7 +563,7 @@ knitr::kable(power_df[1:10, 1:4],
 
 ### Exploratory Analysis
 
-```{r echo=FALSE}
+```{r}
 # Plot data for inspection using plotly for interactive inspection  Note I used a a y log scale to handle the huge outlier
 fig <- power_df %>%
   plot_ly(x= ~DATE) %>%
@@ -584,7 +587,7 @@ Takeaways:
 
 We need to check for any missing values in our data set.  First let's check for explicit missing (i.e. nulls). Note there is **1** missing KWH value.
 
-```{r echo=FALSE}
+```{r}
 # Various NA plots to inspect data
 knitr::kable(miss_var_summary(power_df), 
              caption = 'Missing Values',
@@ -597,7 +600,7 @@ knitr::kable(miss_var_summary(power_df),
 
 We will use `na_kalman()` from the `imputeTS` package to impute any explicit missing values.  This approach as the advantage that it will use trend and seasonal patterns to help fill in values to have better context with surrounding values.  
 
-```{r echo=FALSE}
+```{r}
 # Get highest cash value.
 min_kwh <- min(power_df$KWH, na.rm = TRUE)
 min_date <- power_df %>% 
@@ -621,7 +624,7 @@ power_df <- imp
 
 Next we double check if there are any implicit missing values, i.e. are there any gaps in our time series?  Ideally, we want a continuous time series with a data point at each incremental step in the time series.  We convert our DF to a tsibble and leverage the `count_gaps()` function.  We see no gaps - cool.
 
-```{r echo=FALSE}
+```{r}
 # Convert our time series to a tsibble for convenience
 power_tsb <- as_tsibble(power_df, index=DATE_YM, regular = TRUE, .drop = TRUE)
 
@@ -633,7 +636,7 @@ count_gaps(power_tsb)
 
 Let's check whether a transformation will be helpful by calculating BoxCox lamba.  
 
-```{r echo=FALSE}
+```{r}
 power_ts <- ts(power_df$KWH, start=1998, frequency = 12)
 
 lambda <- round_lambda(power_ts)
@@ -646,7 +649,7 @@ Recommended lambda is 0, so no transformation will be needed.
 
 Let's visualize the seasonal and trend patterns.  This will be help us understand whether differencing will be helpful before modeling.
 
-```{r echo=FALSE}
+```{r}
 d <- decompose(power_ts)
 autoplot(d)
 ```
@@ -655,7 +658,7 @@ We do see a generate upward trend in the data.  Given this, we will want to chec
 
 Checking the BoxCox, we get a recommended $\lambda=0.5$.  Looking at the ACF and pACF plots along with Dickey-Fuller Test, there is a clear lag t 7 which would corespond to ~7 months.  We would expect residential power to peak in Summer and Winter (heating and cooling), so the 7 lag is closee to, but not exactly what we might expect.  We will want to difference with 7 when modeling with Arima.
 
-```{r echo=FALSE}
+```{r}
 lambda <- round_lambda(atm_ts)
 
 acf_plots(atm_ts, lambda)
@@ -667,7 +670,7 @@ acf_plots(atm_ts, lambda)
 
 We will create a training and testing data sets to allow us to evaluate model performance on data that hasn't been seen.  Since we will be forecasting future data, we want to evaluate with *out of sample* data.  This will be a balancing act - by removing months at the end of 2013, the model will perform even worse on 2014.  I'll slice off the last 6 months, and use that as a holdout test set.  We'll train our various models using data through mid-2013 and evaluate on late 2013.  This should help us identify the best candidate model for then predicting 2014.  If we don't apply a hold out, we could get an over fit model that performs well on known data, but poorly on future data. 
 
-```{r echo=FALSE}
+```{r}
 # FB Prophet require column names to be ds and y
 colnames(power_df) <- c('CASE', 'ds', 'y')
 power_df$ds <- as.Date(power_df$ds)
@@ -690,7 +693,7 @@ power_test_ts <- ts(power_test_df$y, start=test_start, frequency = 12)
 
 #### ARIMA Model
 
-```{r echo=FALSE}
+```{r}
 
 power_train_ts %>% diff(7) %>% ggtsdisplay(main=paste('Residential Power with Differencing=7'))
 
@@ -770,7 +773,7 @@ knitr::kable(pred_df,
 
 [https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Project_1/datsets/residential_power_final.csv](https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Project_1/datsets/residential_power_final.csv)
 
-## Part C – BONUS, optional (part or all), Waterflow_Pipe1.xlsx and Waterflow_Pipe2.xlsx
+## Part C – BONUS
 
 Part C consists of two data sets. These are simple 2 columns sets, however they have different time
 stamps. Your optional assignment is to time-base sequence the data and aggregate based on hour
@@ -780,7 +783,7 @@ and present results via Rpubs and .rmd and the forecast in an Excel readable fil
 
 ### Load Data
 
-```{r echo=FALSE}
+```{r}
 # Load the Excel data
 pipe1_df <- readxl::read_excel('./datasets/Waterflow_Pipe1.xlsx')
 colnames(pipe1_df) <- c('DATE', 'WaterFlow')
@@ -797,20 +800,41 @@ pipe1_df <- pipe1_df[order(pipe1_df$DATE),]
 pipe2_df <- pipe2_df[order(pipe2_df$DATE),]
 
 # inspect data.frame to make sure things look fine
-head(pipe1_df)
-head(pipe2_df)
+knitr::kable(pipe1_df[1:10, 1:2], 
+             caption = 'Pipe 1 First 10 Rows',
+             format="html", 
+             table.attr="style='width:60%;'") %>% 
+  kableExtra::kable_styling()
+
+knitr::kable(pipe2_df[1:10, 1:2], 
+             caption = 'Pipe 1 First 10 Rows',
+             format="html", 
+             table.attr="style='width:60%;'") %>% 
+  kableExtra::kable_styling()
 ```
 
 ### Check Missing Data
 
-```{r echo=FALSE}
-miss_var_summary(pipe1_df)
-miss_var_summary(pipe2_df)
+We have no missing data to deal with.
+
+```{r}
+knitr::kable(miss_var_summary(pipe1_df), 
+             caption = 'Pipe 1 Missing Data',
+             format="html", 
+             table.attr="style='width:60%;'") %>% 
+  kableExtra::kable_styling()
+
+knitr::kable(miss_var_summary(pipe2_df), 
+             caption = 'Pipe 2 Missing Data',
+             format="html", 
+             table.attr="style='width:60%;'") %>% 
+  kableExtra::kable_styling()
+
 ```
 
 ### Aggregate Pipes Data
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r message=FALSE, warning=FALSE}
 # Aggregate Pipe1 to the hour, sum flow
 pipe1_hourly_df <- pipe1_df %>%
   mutate(pipe='PIPE1', 
@@ -836,7 +860,11 @@ pipes_hourly_df <- pipes_hourly_df %>%
 
 ### Clean up Time Series
 
-```{r echo=FALSE}
+#### Implicit Missing Data
+
+Check for gaps in the time series - we will need to impute those gaps so we have a consistent regular interval.  There are 256 gaps throughout the data.  I'm using the `imputeTS` package with `na_interpolation()` function with the spline` option.
+
+```{r warning=FALSE, error=FALSE, message=FALSE}
 # Convert our time series to a tsibble for convenience
 pipes_tsb <- as_tsibble(pipes_hourly_df, index=hour)
 
@@ -850,49 +878,60 @@ pipes2_tsb <- pipes_tsb %>%
 
 autoplot(pipes2_tsb)
 
+pipes2_tsb$hour <- as_datetime(pipes2_tsb$hour)
 ```
 
 ### Check Stationary
 
-```{r echo=FALSE}
+We will apply a BoxCox transform with $\lambda=0.5$.  The series is stationary.  We a clear 3 hour lag "seasonal" cycle.  We'll want to diff by 3 when building model.
 
-pipes2_tsb %>%
-  model(STL(WaterFlow_tot ~ trend(window=13) + season(window='periodic'), robust = TRUE)) %>%
-  components() %>%
-  autoplot() + xlab("Year") +
-  ggtitle("Classical additive decomposition of total US retail employment")
+```{r warning=FALSE}
+pipes2_ts <- as.ts(pipes2_tsb$WaterFlow_tot )
 
-start_ts <- min(pipes2_tsb$hour)
-start_ts <- c(year(start_ts), yday(start_ts))
-pipes2_msts <- msts(pipes2_tsb, seasonal.periods = c(1, 7*24), start=start_ts)
+lambda <- round_lambda(pipes2_ts)
 
-# pipes2_msts$WaterFlow_tot %>% mstl() %>% autoplot()
+acf_plots(pipes2_ts, lambda)
 ```
 
+### Forecasting
 
-```{r echo=FALSE}
-decomp <- decompose(enplanements)
-#decomp <- decompose(pipes2_tsb)
+```{r }
+pipes2_ts <- as.ts(pipes2_tsb$WaterFlow_tot, frequency=3)
 
-#autoplot(pipes2_tsb, xlab='Time', ylab='Water Flow', main='Water Flow thru Pipes') + 
-#  autolayer(decomp$trend, series="Trend", colour=TRUE) + 
-##  autolayer(decomp$seasonal, series="Seasonal", colour=TRUE) + 
-#  autolayer(decomp$random, series="Residuals", colour=TRUE)
+pipes2_ts %>% diff(3) %>% ggtsdisplay(main=paste('Pipes Waterflow with Differencing=3'))
 
-#ggAcf(pipes2_tsb)
-#ggPacf(pipes2_tsb)
+# Buld ARIMA model using built in auto.arima()
+model3 <- auto.arima(pipes2_ts, stepwise = FALSE, parallel = TRUE, approximation = FALSE)
+summary(model3)
 
-#Box.test(pipes2_tsb$WaterFlow_tot, lag=24*7, type="Ljung-Box")
+print(model3 %>% 
+        forecast(7*24) %>% 
+        autoplot() + 
+        ggtitle(paste(machine, 'Forecast WaterFlow (1 week forward)')) 
+      ) 
 
-#pipes2d_tsb <- pipes2_tsb$WaterFlow_tot %>% diff(1)
-#ggAcf(pipes2d_tsb)
-#ggPacf(pipes2d_tsb)
+print(checkresiduals(model3))
 
-#diff(pipes_tsb, differences=1)
+data <- model3 %>% forecast(7*24)
+
+st <- max(pipes2_tsb$hour) + as.difftime(c(1), units = "hours")
+en <- st %m+% weeks(1)
+data$ds <- seq.POSIXt(st, en, by=as.difftime(c(1), units = "hours"))
+#data$ds <- strftime(data$ds, '%Y-%b')
+
+predictions <- cbind(as.character(data$ds), as.numeric(data$mean))
+colnames(predictions) <- c('Date Time', 'WaterFlow')
+
+pred_df <- as.data.frame(predictions)
+pred_df$WaterFlow <- as.numeric(pred_df$WaterFlow)
+
+# Append forecast values to end of original dataset
+waterflow_output_df <- rbind(pipes2_ts, pred_df)
+
+# Save final dataset with forecasts appended to end
+write.csv(waterflow_output_df, './datasets/waterflow_final.csv')
 ```
 
+** Final Forecast results are on GitHub at: **
 
-## References
-
-- Toni Giorgino (2009). Computing and Visualizing Dynamic Time Warping Alignments in R: The dtw Package. Journal of Statistical Software, 31(7), 1-24, doi:10.18637/jss.v031.i07.
-
+[https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Project_1/datsets/waterflow_final.csv](https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Project_1/datsets/waterflow_final.csv)
