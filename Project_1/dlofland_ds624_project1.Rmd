@@ -1,9 +1,11 @@
 ---
-title: "ATM Forecast"
+title: "Forecasting Project"
 subtitle: 'DS624 Project 1 (Fall 2020)'
 author: "Donny Lofland"
 date: "10/23/2020"
 output: 
+  pdf_document:
+    extra_dependencies: ["geometry", "multicol", "multirow", "xcolor"]
   html_document:
     code_folding: hide
     theme: cerulean
@@ -11,15 +13,15 @@ output:
     css: ./lab.css
     toc: true
     toc_float: true
-  pdf_document:
-    extra_dependencies: ["geometry", "multicol", "multirow", "xcolor"]
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-	message = FALSE,
-	warning = FALSE
-)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+Source Code: [https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Project_1](https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Project_1)
+
+```{r}
 library(fpp2)          # Hyndman's Forecasting Principals and Practice package
 
 # === libraries imported by fpp2 ===
@@ -137,7 +139,6 @@ round_lambda <- function(series) {
 }
 ```
 
-Source Code: [https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Project_1](https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Project_1)
 
 ## Part A – ATM Forecast
 
@@ -527,7 +528,7 @@ knitr::kable(pred_df,
 
 ** Final Forecast results are on GitHub at:
 
-[https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Project_1/datsets/atm_final.csv](https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Project_1/datsets/atm_final.csv)
+[https://github.com/djlofland/DATA624_PredictiveAnalytics/blob/master/Project_1/datasets/atm_final.csv](https://github.com/djlofland/DATA624_PredictiveAnalytics/blob/master/Project_1/datasets/atm_final.csv)
 
 ## Part B – Forecasting Power
 
@@ -771,7 +772,7 @@ knitr::kable(pred_df,
 
 ** Final Forecast results are on GitHub at: **
 
-[https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Project_1/datsets/residential_power_final.csv](https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Project_1/datsets/residential_power_final.csv)
+[https://github.com/djlofland/DATA624_PredictiveAnalytics/blob/master/Project_1/datasets/residential_power_final.csv](https://github.com/djlofland/DATA624_PredictiveAnalytics/blob/master/Project_1/datasets/residential_power_final.csv)
 
 ## Part C – BONUS
 
@@ -934,4 +935,4 @@ write.csv(waterflow_output_df, './datasets/waterflow_final.csv')
 
 ** Final Forecast results are on GitHub at: **
 
-[https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Project_1/datsets/waterflow_final.csv](https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Project_1/datsets/waterflow_final.csv)
+[https://github.com/djlofland/DATA624_PredictiveAnalytics/blob/master/Project_1/datasets/waterflow_final.csv](https://github.com/djlofland/DATA624_PredictiveAnalytics/blob/master/Project_1/datasets/waterflow_final.csv)
