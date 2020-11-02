@@ -47,6 +47,9 @@ library(pls)
 library(stats)
 library(bnstruct)
 
+library(outlieR)
+library(outliers)
+
 set.seed(424242)
 ```
 
@@ -294,16 +297,23 @@ lowVariance <- nearZeroVar(x_imputed)
 x_lowvar <- x_imputed[,-lowVariance]
 ```
 
+Let's deal with outliers - rrepalce them with the MEDIAN from that feature:
+
+```{r}
+x_outliers <- outlieR::impute(x_lowvar, fill='median')
+```
+
+
 Now, lets drop any columns with high correlations
 
 ```{r}
 # Find and drop high correlation features
-correlations <- cor(x_lowvar)
+correlations <- cor(x_outliers)
 highCorr <- findCorrelation(correlations, names=TRUE, cutoff=0.9)
 (highCorr)
 
 highCorr <- findCorrelation(correlations, cutoff=0.9)
-x_corr <- x_lowvar[,-highCorr]
+x_corr <- x_outliers[,-highCorr]
 
 head(x_corr)
 ```
@@ -360,9 +370,8 @@ lassoPred <- predict(enetTune, newdata=trainX)
 
 lassoValues <- data.frame(obs = trainY, pred=lassoPred)
 colnames(lassoValues) = c('obs', 'pred')
-defaultSummary(lassoValues)
+(train_values <- defaultSummary(lassoValues))
 ```
-
 
 d. Predict the response for the test set. What is the value of the performance
 metric and how does this compare with the resampled performance metric
@@ -373,10 +382,10 @@ lassoPred <- predict(enetTune, newdata=testX)
 
 lassoValues <- data.frame(obs = testY, pred=lassoPred)
 colnames(lassoValues) = c('obs', 'pred')
-defaultSummary(lassoValues)
+(test_values <- defaultSummary(lassoValues))
 ```
 
-> With the training data, we had an RMSE of 0.6646.  With the test data, this ws 0.6358.  These seem reasonable and quite good.  We expect the training RMSE to be higher.  
+> With the training data, we had an RMSE of `r train_values[2]`.  With the test data, this was `r test_values[2]`.  These seem reasonable and quite good.  We expect the training RMSE to be higher.  
 
 e. Which predictors are most important in the model you have trained? Do
 either the biological or process predictors dominate the list?
@@ -386,7 +395,7 @@ enetImp <- varImp(enetTune, scale = FALSE)
 plot(enetImp, top = 20)
 ```
 
-> We have more Manufacturing Features in the top 20 (13) vs Biological (7).  That said, we had more Manufacturing features to start with so, this could just be a class imbalance issue.
+> We have more Manufacturing Features in the top 20 (15) vs Biological (5).  That said, we had more Manufacturing features to start with so, this could just be a class imbalance issue. ... or maybe Manufacturing Processes have more impact than base Biological?
 
 f. Explore the relationships between each of the top predictors and the response.
 How could this information be helpful in improving yield in future
@@ -400,9 +409,8 @@ features <- as.data.frame(enetImp[["importance"]]) %>%
 
 features <- features[1:20]
 
-cmp_imp <- cmp[features]
+cmp_imp <- as.data.frame(x_outliers)[features]
 cmp_imp$Yield <- cmp$Yield
-head(cmp_imp)
 
 featurePlot(x = cmp_imp[features], 
             y = cmp_imp$Yield, 
