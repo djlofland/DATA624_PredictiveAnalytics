@@ -1,0 +1,468 @@
+---
+title: 'DS 624: Homwork 8 (Nonlinear Regression)'
+subtitle: 'Kuhn: 7.2, 7.5'
+author: 'Donny Lofland'
+data: '11/30/2020'
+output:
+  html_document:
+    theme: cerulean
+    highlight: pygments
+    css: ./lab.css
+    toc: true
+    toc_float: true
+  pdf_document:
+    extra_dependencies: ["geometry", "multicol", "multirow", "xcolor"]
+---
+
+Source Code: [https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Homework_8](https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Homework_8)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+library(fpp2)
+library(ggplot2)
+library(tseries)
+library(gridExtra)
+library(forecast)
+library(timetk)
+library(tidyverse)
+library(seasonal)
+library(corrplot)
+library(RColorBrewer)
+library(lattice)
+library(hablar)
+library(naniar)
+
+library(AppliedPredictiveModeling)
+library(e1071)
+library(mlbench)
+library(caret)
+library(ipred)
+library(MASS)
+library(elasticnet)
+library(lars)
+library(pls)
+library(stats)
+library(bnstruct)
+library(earth)
+library(kernlab)
+library(nnet)
+
+library(outlieR)
+library(outliers)
+
+library(doParallel)
+
+set.seed(424242)
+```
+
+## Problem 7.2
+
+Friedman (1991) introduced several benchmark data sets create by simulation. One of these simulations used the following nonlinear equation to create data:
+
+$$y = 10 sin(\pi x_1 x_2) + 20(x_3 − 0.5)^2 + 10x_4 + 5x_5 + N(0, \sigma^2)$$
+where the x values are random variables uniformly distributed between [0, 1] (there are also 5 other non-informative variables also created in the simulation). The package `mlbench` contains a function called `mlbench.friedman1` that simulates these data:
+
+### Load Data
+
+```{r}
+
+set.seed(200)
+
+trainingData <- mlbench.friedman1(200, sd = 1)
+
+## We convert the 'x' data from a matrix to a data frame
+## One reason is that this will give the columns names.
+trainingData$x <- data.frame(trainingData$x)
+
+## Look at the data using
+featurePlot(trainingData$x, trainingData$y)
+
+## or other methods.
+
+## This creates a list with a vector 'y' and a matrix
+## of predictors 'x'. Also simulate a large test set to
+## estimate the true error rate with good precision:
+testData <- mlbench.friedman1(5000, sd = 1)
+testData$x <- data.frame(testData$x)
+```
+
+Tune several models on these data. For example:
+
+### KNN
+
+```{r}
+
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
+
+knnModel <- train(x = trainingData$x, y = trainingData$y,
+  method = "knn",
+  preProc = c("center", "scale"),
+  tuneLength = 10)
+
+stopCluster(cl)
+
+# Model results
+plot(knnModel)
+summary(knnModel)
+varImp(knnModel)
+
+knnPred <- predict(knnModel, newdata = testData$x)
+
+## The function 'postResample' can be used to get the test set
+## perforamnce values
+(knnPerf <- postResample(pred = knnPred, obs = testData$y))
+
+```
+
+### NNET
+
+```{r}
+
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
+
+## Create a specific candidate set of models to evaluate:
+nnetGrid <- expand.grid(
+  .decay = c(0, 0.01, .1),
+  .size = c(1:10),
+  ## The next option is to use bagging (see the
+  ## next chapter) instead of different random
+  ## seeds.
+  .bag = FALSE)
+
+ctrl <- trainControl(method='cv', number=10)
+
+nnetModel <- train(trainingData$x, trainingData$y,
+  method = "avNNet",
+  tuneGrid = nnetGrid,
+  trControl = ctrl,
+  linout = TRUE,
+  trace = FALSE,
+  MaxNWts = 10 * (ncol(trainingData$x) + 1) + 10 + 1,
+  maxit = 500)
+
+stopCluster(cl)
+
+# Model results
+plot(nnetModel)
+summary(nnetModel)
+varImp(nnetModel)
+
+nnetPred <- predict(nnetModel, newdata = testData$x)
+
+## The function 'postResample' can be used to get the test set
+## perforamnce values
+(nnetPerf <- postResample(pred = nnetPred, obs = testData$y))
+
+```
+
+### SVM
+
+```{r}
+
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
+
+svmModel <- train(trainingData$x, trainingData$y,
+  method = "svmRadial",  # svmRadial, svmLinear, svmPoly
+  tuneLength = 14,
+  trControl = trainControl(method = "cv"))
+
+stopCluster(cl)
+
+# Model results
+plot(svmModel)
+summary(svmModel)
+varImp(svmModel)
+
+svmPred <- predict(svmModel, newdata = testData$x)
+
+## The function 'postResample' can be used to get the test set
+## perforamnce values
+(svmPerf <- postResample(pred = svmPred, obs = testData$y))
+
+```
+
+### MARS
+
+```{r}
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
+
+# Define the candidate models to test
+marsGrid <- expand.grid(.degree = 1:2, .nprune = 2:38)
+
+marsModel <- train(trainingData$x, trainingData$y,
+  method = "earth",
+  tuneGrid = marsGrid,
+  trControl = trainControl(method = "cv"))
+
+stopCluster(cl)
+
+# Model results
+plot(marsModel)
+summary(marsModel)
+varImp(marsModel)
+
+marsPred <- predict(marsModel, newdata = testData$x)
+
+## The function 'postResample' can be used to get the test set
+## perforamnce values
+(marsPerf <- postResample(pred = marsPred, obs = testData$y))
+
+```
+
+### Results
+
+Which models appear to give the best performance? Does MARS select the informative predictors (those named X1–X5)?
+
+```{r}
+(models_summary <- rbind(nnetPerf, marsPerf, svmPerf, knnPerf))
+```
+
+> All three models (KNN, MARS and SVM) identified `X4`, `X1`, `X2`, `X5`, and `X3` as the top 5 features.  The only difference is that MARS had `X1` as 1st and `X4` as 2nd.  The others had `X4` 1st and `x1` 2nd.
+
+## Problem 7.5
+
+7.5. Exercise 6.3 describes data for a chemical manufacturing process. Use
+the same data imputation, data splitting, and pre-processing steps as before
+and train several nonlinear regression models.
+
+### Load & Clean Data
+
+```{r}
+# NOTE: Code copied from my Homework #7
+data("ChemicalManufacturingProcess")
+
+cmp <- as_tibble(ChemicalManufacturingProcess)
+
+x_raw <- cmp[,2:58]
+y_raw <- as.matrix(cmp$Yield)
+
+print(paste(nrow(x_raw), ncol(x_raw)))
+print(paste(nrow(y_raw), ncol(y_raw)))
+
+# Various NA plots to inspect data
+knitr::kable(miss_var_summary(cmp) %>% filter(n_miss > 0), 
+             caption = 'Missing Values',
+             format="html", 
+             table.attr="style='width:50%;'") %>% 
+  kableExtra::kable_styling()
+gg_miss_var(cmp)
+gg_miss_upset(cmp)
+
+# Impute missing using KNN
+x_imputed <- knn.impute(as.matrix(x_raw), k=10)
+
+# Check for columns with little variance - candidate to drop
+lowVariance <- nearZeroVar(x_imputed, names = TRUE)
+head(lowVariance)
+lowVariance <- nearZeroVar(x_imputed)
+
+x_lowvar <- x_imputed[,-lowVariance]
+
+# Deal with outliers ... impute to median
+x_outliers <- outlieR::impute(x_lowvar, fill='median')
+
+# Find and drop high correlation features
+correlations <- cor(x_outliers)
+highCorr <- findCorrelation(correlations, names=TRUE, cutoff=0.9)
+(highCorr)
+
+highCorr <- findCorrelation(correlations, cutoff=0.9)
+x_corr <- x_outliers[,-highCorr]
+
+# Transofrm our dat (scale, center, boxcox)
+x_transf <-  preProcess(x_corr, method=c('center', 'scale', 'BoxCox'))
+x_transf <- predict(x_transf, x_corr)
+```
+
+### Split Training/Testing:
+
+```{r}
+# get training/test split
+trainingRows <- createDataPartition(y_raw, p=0.8, list=FALSE)
+
+# Build training datasets
+trainX <- x_transf[trainingRows,]
+trainY <- y_raw[trainingRows]
+
+# put remaining rows into the test sets
+testX <- x_transf[-trainingRows,]
+testY <- y_raw[-trainingRows]
+
+# Build a DF
+trainingData <- as.data.frame(trainX)
+trainingData$Yield <- trainY
+```
+
+
+### Part (A)
+
+a. Which nonlinear regression model gives the optimal resampling and test set performance?
+
+#### Neural Net
+
+```{r}
+set.seed(42424)
+
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
+
+## Create a specific candidate set of models to evaluate:
+nnetGrid <- expand.grid(
+  .decay = c(0, 0.01, .1),
+  .size = c(1:10),
+  ## The next option is to use bagging (see the
+  ## next chapter) instead of different random
+  ## seeds.
+  .bag = FALSE)
+
+ctrl <- trainControl(method='cv', number=10)
+
+nnetTune <- train(trainX, trainY,
+  method = "avNNet",
+  tuneGrid = nnetGrid,
+  trControl = ctrl,
+  linout = TRUE,
+  trace = FALSE,
+  MaxNWts = 10 * (ncol(trainX) + 1) + 10 + 1,
+  maxit = 500)
+
+stopCluster(cl)
+
+# Model results
+plot(nnetTune)
+summary(nnetTune)
+varImp(nnetTune)
+
+modelPred <- predict(nnetTune, newdata=trainX)
+
+modelValues <- data.frame(obs = trainY, pred=modelPred)
+colnames(modelValues) = c('obs', 'pred')
+(nnet_values <- defaultSummary(modelValues))
+```
+
+#### MARS
+
+```{r}
+set.seed(42424)
+
+# Define the candidate models to test
+marsGrid <- expand.grid(.degree = 1:2, .nprune = 2:38)
+
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
+
+marsTune <- train(trainX, trainY,
+  method = "earth",
+  tuneGrid = marsGrid,
+  trControl = trainControl(method = "cv"))
+
+stopCluster(cl)
+
+# Model Results
+plot(marsTune)
+summary(marsTune)
+varImp(marsTune)
+
+modelPred <- predict(marsTune, newdata=trainX)
+
+modelValues <- data.frame(obs = trainY, pred=modelPred)
+colnames(modelValues) = c('obs', 'pred')
+(mars_values <- defaultSummary(modelValues))
+```
+
+#### SVM 
+
+```{r}
+set.seed(42424)
+
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
+
+svmRTune <- train(trainX, trainY,
+  method = "svmRadial",  # svmRadial, svmLinear, svmPoly
+  tuneLength = 14,
+  trControl = trainControl(method = "cv"))
+
+stopCluster(cl)
+
+# Model Results
+plot(svmRTune)
+summary(svmRTune)
+
+varImp(svmRTune)
+
+modelPred <- predict(svmRTune, newdata=trainX)
+
+modelValues <- data.frame(obs = trainY, pred=modelPred)
+colnames(modelValues) = c('obs', 'pred')
+(svm_values <- defaultSummary(modelValues))
+```
+
+#### KNN
+
+```{r}
+set.seed(42424)
+
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
+
+knnTune <- train(trainX, trainY,
+  method = "knn",
+  # Center and scaling will occur for new predictions too
+  preProc = c("center", "scale"),
+  tuneGrid = data.frame(.k = 1:20),
+  trControl = trainControl(method = "cv"))
+
+stopCluster(cl)
+
+# Model Results
+plot(knnTune)
+summary(knnTune)
+
+varImp(knnTune)
+
+modelPred <- predict(knnTune, newdata=trainX)
+
+modelValues <- data.frame(obs = trainY, pred=modelPred)
+colnames(modelValues) = c('obs', 'pred')
+(knn_values <- defaultSummary(modelValues))
+```
+
+#### Models Summary
+
+```{r}
+(models_summary <- rbind(nnet_values, mars_values, svm_values, knn_values))
+```
+
+> NNET appears to provide the best RMSE and $R^2$ of the tuned models for NNET, MARS, SVM and KNN.
+
+b. Which predictors are most important in the optimal nonlinear regression model? Do either the biological or process variables dominate the list? How do the top ten important predictors compare to the top ten predictors from the optimal linear model?
+
+> `ManufacturingProcess*` features dominate the top most important featrues for all models.  The top 10 predictors are the same for NNET, SVM and KNN.  Only MARS had a differnt top feature list.  All four non-linear models consistently picked `ManufacturingProcess32`, `ManufacturingProcess13`, `ManufacturingProcess09`, and `BiologicalMaterial06` in the top 10.
+
+> Referring back to Problem 6.3 in Homwwork #7, these same 4 features also show as top using `varImp()`.  However, we improved our RMSE and Rsquared values using non-linear models over the linear counterparts.
+
+c. Explore the relationships between the top predictors and the response for the predictors that are unique to the optimal nonlinear regression model. Do these plots reveal intuition about the biological or process predictors and their relationship with yield?
+
+```{r}
+df <- cmp %>% 
+  dplyr::select(c('ManufacturingProcess32', 'ManufacturingProcess13', 'ManufacturingProcess09', 'BiologicalMaterial06', 'Yield'))
+
+
+caret::featurePlot(x=df['ManufacturingProcess32'], y=df['Yield'], plot="pairs", pch=20)
+caret::featurePlot(x=df['ManufacturingProcess13'], y=df['Yield'], plot="pairs", pch=20)
+caret::featurePlot(x=df['ManufacturingProcess09'], y=df['Yield'], plot="pairs", pch=20)
+caret::featurePlot(x=df['BiologicalMaterial06'], y=df['Yield'], plot="pairs", pch=20)
+
+```
+
+
+
+SInce we don't actually know what each Process physically maps to in the real world, it's a little hard to apply intuition.  I don't know how `ManufacturingProcess32` differs from `ManufacturingProcess09`. That said, we do see clear patterns between the features and `Yield` which we would expect since these were shown to be the top predictors.  Had we seen no visual relationships, it's possible there was still one detectable in the math, but that would have been concerning.  `ManufacturingProcess32`, `ManufacturingProcess09`, and `BiologicalMaterial06` show increase in `Yield` with an increase in the feature.  `ManufacturingProcess13` shows a decrease in `Yield` as the feature increases.
