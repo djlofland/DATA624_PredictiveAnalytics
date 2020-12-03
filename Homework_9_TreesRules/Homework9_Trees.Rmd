@@ -1,0 +1,513 @@
+---
+title: 'DS 624: Homwork 9 (Trees and Rules)'
+subtitle: 'Kuhn: 8.1, 8.2, 8.3, 8.7'
+author: 'Donny Lofland'
+data: '12/1/2020'
+output:
+  html_document:
+    theme: cerulean
+    highlight: pygments
+    css: ./lab.css
+    toc: true
+    toc_float: true
+    code_folding: hide
+  pdf_document:
+    extra_dependencies: ["geometry", "multicol", "multirow", "xcolor"]
+---
+
+Source Code: [https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Homework_9](https://github.com/djlofland/DATA624_PredictiveAnalytics/tree/master/Homework_9)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+library(fpp2)
+library(ggplot2)
+library(tseries)
+library(gridExtra)
+library(forecast)
+library(timetk)
+library(tidyverse)
+library(seasonal)
+library(corrplot)
+library(RColorBrewer)
+library(lattice)
+library(hablar)
+library(naniar)
+
+library(AppliedPredictiveModeling)
+library(e1071)
+library(mlbench)
+library(caret)
+library(ipred)
+library(MASS)
+library(elasticnet)
+library(lars)
+library(pls)
+library(stats)
+library(bnstruct)
+library(earth)
+library(kernlab)
+library(nnet)
+library(randomForest)
+library(party)
+library(gbm)
+
+library(outlieR)
+library(outliers)
+
+library(doParallel)
+
+set.seed(424242)
+```
+
+## Problem 8.1
+
+Recreate the simulated data from Exercise 7.2:
+
+### Load Data
+
+```{r}
+set.seed(200)
+simulated <- mlbench.friedman1(200, sd = 1)
+simulated <- cbind(simulated$x, simulated$y)
+simulated <- as.data.frame(simulated)
+colnames(simulated)[ncol(simulated)] <- "y"
+```
+
+
+### Part (A)
+
+Fit a random forest model to all of the predictors, then estimate the variable importance scores:
+
+```{r}
+set.seed(200)
+model1 <- randomForest(y ~ ., data = simulated,
+  importance = TRUE,
+  ntree = 1000)
+
+(rfImp1 <- varImp(model1, scale = FALSE))
+```
+
+Did the random forest model significantly use the uninformative predictors (V6 – V10)?
+
+> RandomForest identified `V1`-`V5` as the more important features, but found `V6`-`V10` to not be significantly important.
+
+### Part (B) 
+
+Now add an additional predictor that is highly correlated with one of the informative predictors. For example:
+
+```{r}
+set.seed(200)
+simulated$duplicate1 <- simulated$V1 + rnorm(200) * .1
+cor(simulated$duplicate1, simulated$V1)
+```
+
+Fit another random forest model to these data. Did the importance score for V1 change? 
+
+```{r}
+set.seed(200)
+model2 <- randomForest(y ~ ., data = simulated,
+  importance = TRUE,
+  ntree = 1000)
+
+(rfImp1 <- varImp(model2, scale = FALSE))
+```
+
+> Yes, the importnce score for `V1` decreased when we added a highly correlated feature `duplicate1`
+
+What happens when you add another predictor that is also highly correlated with V1?
+
+```{r}
+set.seed(200)
+simulated$duplicate2 <- simulated$V1 + rnorm(200) * .1
+cor(simulated$duplicate1, simulated$V1)
+
+set.seed(200)
+model3 <- randomForest(y ~ ., data = simulated,
+  importance = TRUE,
+  ntree = 1000)
+
+(rfImp1 <- varImp(model3, scale = FALSE))
+```
+
+> The importance score for `V1` decreases further when another highly correlated feature `duplicate2` is added.
+
+### Part (C) 
+
+Use the `cforest` function in the `party` package to fit a random forest model
+using conditional inference trees. The `party` package function `varimp` can
+calculate predictor importance. The `conditional` argument of that function
+toggles between the traditional importance measure and the modified
+version described in Strobl et al. (2007). Do these importances show the
+same pattern as the traditional random forest model?
+
+```{r}
+library(party)
+
+set.seed(200)
+model4 <- cforest(y ~ ., data = simulated)
+
+(rfImp2 <- varimp(model4, conditional = FALSE) %>% 
+    sort(decreasing = T))
+(rfImp3 <- varimp(model4, conditional = TRUE) %>% 
+    sort(decreasing = T))
+
+summary(model4)
+```
+
+> Using the `party::cforest` model and `conditional=FALSE`, we get the same feature importance scores as seen with the `randomForest` version.  With `conditional=TRUE` we get different scores. While the score differ, their order doesn't.
+
+
+### Part (D)
+
+Repeat this process with different tree models, such as boosted trees and Cubist. Does the same pattern occur?
+
+#### Boosted Tree
+
+```{r}
+
+#gbmModel <- gbm(y ~ ., data = simulated, distribution="gaussian")
+
+gbmGrid <- expand.grid(
+  interaction.depth = seq(1, 7, by = 2),
+  n.trees = seq(100, 1000, by = 50),
+  shrinkage = c(0.01, 0.1),
+  n.minobsinnode=10)
+
+metric <- "RMSE"
+trainControl <- trainControl(method="cv", number=10)
+
+set.seed(200)
+
+trainX <- simulated %>% 
+  dplyr::select(-y)
+  
+gbmTune <- train(trainX, simulated$y,
+  method = "gbm",
+  tuneGrid = gbmGrid,
+  trControl=trainControl, 
+  metric=metric, 
+  bag.fraction=0.75,
+  verbose = FALSE)
+
+(gbmImp1 <- varImp(gbmTune, scale = FALSE))
+summary(gbmTune)
+```
+
+
+#### Cubist
+
+```{r}
+library(Cubist)
+
+# cubistMod <- cubist(trainX, simulated$y)
+cubistMod <- train(trainX, simulated$y, method="cubist")
+(cubImp1 <- varImp(cubistMod, scale = FALSE))
+```
+
+> Cubist definitely handles feature importance differently than randomForest.  With cubist, the order of features switched.
+
+## Problem 8.2
+
+Use a simulation to show tree bias with different granularities.
+
+```{r}
+
+# Construct a simple dataset with a few features having different frequencies.  Add copies of feature rows
+# so some can be excluded from the target and we can create a simple linear model
+rows <- list()
+
+for (i in 1:1000) {
+  row <- list(i, floor(i/10), floor(i/100), i, floor(i/10), floor(i/100))
+  rows <- rbind(rows, row)
+}
+
+# Make sure everything is numeric
+df <- as_tibble(rows)
+df <- transform(df, 
+                V1=as.numeric(V1), 
+                V2=as.numeric(V2), 
+                V3=as.numeric(V3),
+                V4=as.numeric(V4),
+                V5=as.numeric(V5),
+                V6=as.numeric(V6))
+
+# Add a target variable, y, that is a simple linear combiation of V4, V5 and V6
+df$y <- (2 * df$V4) + (2 * df$V5) + (2 * df$V6)
+
+# Randomize row order
+rows <- sample(nrow(df))
+df <- df[rows, ]
+
+# Run RandomForest
+set.seed(200)
+rfModel <- randomForest(y ~ ., data = df,
+  importance = TRUE,
+  ntree = 1000)
+
+# Show Feature importance
+(dfImp <- varImp(rfModel, scale = FALSE))
+
+```
+
+> In this simple dataset, `V1`, `V2` and `V3` aren't included in the linear formula for `y`; however, they are perfectly correlated with `V4`, `V5`, and `V6` so RandomForest incorrectly gives distribites the importance score across the irrelavant features since it cannot tell the difference.  Next, the formula for y is a simple linear function, so each variable `V4`, `V5` and `V6` should contribute **equal** weight to `y` and have **equal importance scores**; however, due to bias, RF puts more importance on the features with more distinct values - in this case `V4` has 1000 value while `V5` has 100 value and `V6` only has 10 values.
+
+
+## Problem 8.3
+
+In stochastic gradient boosting the bagging fraction and learning rate will govern the construction of the trees as they are guided by the gradient. Although the optimal values of these parameters should be obtained through the tuning process, it is helpful to understand how the magnitudes of these parameters affect magnitudes of variable importance. Figure 8.24 provides the variable importance plots for boosting using two extreme values for the bagging fraction (0.1 and 0.9) and the learning rate (0.1 and 0.9) for the solubility data. The left-hand plot has both parameters set to 0.1, and the right-hand plot has both set to 0.9:
+
+### Part (A)
+
+Why does the model on the right focus its importance on just the first few of predictors, whereas the model on the left spreads importance across more predictors?
+
+> The bagged fraction governs how many sample will be used in each step to create a model and learning rate governs the percentage of the new prediction that will be added to the previous pass.  The Figure on the right has learning rate = 0.9 and bagged fraction = 0.9.  Since the bagged fraction is 0.9, 90% of sample will be drawn which represents most of the total available samples.  As such, with each pass, our models will end up being fairly similar and each step will reinforce the previous steps.  With a learning rate = 0.9, we are also reinforcing such that the models tend to be similar and inflate the most important features.  The figure on the left, with learning rate = 0.1 and bagged fraction = 0.1, will generate tress with more diversity and thus lower down features have a chance to compete for attention - hence more importance given to lower down features.
+
+### Part (B)
+
+Which model do you think would be more predictive of other samples?
+
+> The model on the right (0.9, 0.9) probably doesn't generalize as well - as mentioned, by having high bagging fraction and learning rate, it hasn't seen as many combinations of different trees so will overemphasize the few top features.  The model on the LEFT (0.1, 0.1) has had a chance to weigh more combinations of different trees providing a better ensemble, lower error, and better generalization.  The issue with too low a bagging fraction and/or learning rate is that a model might not have explored enough to learn all the patterns.  However, from the text, we know that an ensemble with a bunch of weak learners can perform quite well.  I think the LEFT is better, but it's possible the rates are suboptimally low - we don't know without some hyperparameter tuning.
+
+### Part (C)
+
+How would increasing interaction depth affect the slope of predictor importance for either model in Fig. 8.24?
+
+> Interaction depth is the number of splits that need to be performed on a tree and increasing this increases the total number of nodes.  If interactin depth is too low, we probably have very low accuracy (not enought resolution).  As interaction depth increases, above a threshold, we probalky have too many nodes which wouild lead to overfitting and lack of generalization.  Increasing interaction depth on the LEFT chart (0.1, 0.1)  would probably provide more resolution, but with such a small learning rate, it might be counter productive.  For the model on the RIGHT (0.9, 0.9), I would suspect increasing tree depth might actually hurt performance.
+
+## Problem 8.7
+
+Refer to Exercises 6.3 and 7.5 which describe a chemical manufacturing process. Use the same data imputation, data splitting, and pre-processing steps as before and train several tree-based models:
+
+### Load & Clean Data
+
+```{r}
+# NOTE: Code copied from my Homework #7
+data("ChemicalManufacturingProcess")
+
+cmp <- as_tibble(ChemicalManufacturingProcess)
+
+x_raw <- cmp[,2:58]
+y_raw <- as.matrix(cmp$Yield)
+
+print(paste(nrow(x_raw), ncol(x_raw)))
+print(paste(nrow(y_raw), ncol(y_raw)))
+
+# Various NA plots to inspect data
+knitr::kable(miss_var_summary(cmp) %>% filter(n_miss > 0), 
+             caption = 'Missing Values',
+             format="html", 
+             table.attr="style='width:50%;'") %>% 
+  kableExtra::kable_styling()
+gg_miss_var(cmp)
+gg_miss_upset(cmp)
+
+# Impute missing using KNN
+x_imputed <- knn.impute(as.matrix(x_raw), k=10)
+
+# Check for columns with little variance - candidate to drop
+lowVariance <- nearZeroVar(x_imputed, names = TRUE)
+head(lowVariance)
+lowVariance <- nearZeroVar(x_imputed)
+
+x_lowvar <- x_imputed[,-lowVariance]
+
+# Deal with outliers ... impute to median
+x_outliers <- outlieR::impute(x_lowvar, fill='median')
+
+# Find and drop high correlation features
+correlations <- cor(x_outliers)
+highCorr <- findCorrelation(correlations, names=TRUE, cutoff=0.9)
+(highCorr)
+
+highCorr <- findCorrelation(correlations, cutoff=0.9)
+x_corr <- x_outliers[,-highCorr]
+
+# Transofrm our dat (scale, center, boxcox)
+x_transf <-  preProcess(x_corr, method=c('center', 'scale', 'BoxCox'))
+x_transf <- predict(x_transf, x_corr)
+```
+
+### Split Training & Testing
+
+```{r}
+# get training/test split
+trainingRows <- createDataPartition(y_raw, p=0.8, list=FALSE)
+
+# Build training datasets
+trainX <- x_transf[trainingRows,]
+trainY <- y_raw[trainingRows]
+
+# put remaining rows into the test sets
+testX <- x_transf[-trainingRows,]
+testY <- y_raw[-trainingRows]
+
+# Build a DF
+trainingData <- as.data.frame(trainX)
+trainingData$Yield <- trainY
+```
+
+
+### Part (A)
+
+Which tree-based regression model gives the optimal resampling and test set performance?
+
+#### RandomForest
+
+```{r}
+set.seed(42424)
+
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
+
+## Create a specific candidate set of models to evaluate:
+rfGrid <- expand.grid(
+  .mtry = c(2, 8, 14, 20, 26)
+)
+
+ctrl <- trainControl(method='cv', number=10)
+
+rfTune <- train(trainX, trainY,
+  method = "rf",
+  tuneGrid = rfGrid,
+  trControl = ctrl)
+
+stopCluster(cl)
+
+# Model results
+plot(rfTune)
+summary(rfTune)
+varImp(rfTune)
+
+modelPred <- predict(rfTune, newdata=testX)
+
+modelValues <- data.frame(obs = testY, pred=modelPred)
+colnames(modelValues) = c('obs', 'pred')
+(rf_values <- defaultSummary(modelValues))
+```
+
+
+#### GBM
+
+```{r}
+set.seed(42424)
+
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
+
+## Create a specific candidate set of models to evaluate:
+gbmGrid <- expand.grid(
+  .interaction.depth = seq(1, 7, by = 2),
+  .n.trees = seq(100, 1000, by = 50),
+  .shrinkage = c(0.01, 0.1),
+  .n.minobsinnode = 10
+  )
+
+ctrl <- trainControl(method='cv', number=10)
+
+gbmTune <- train(trainX, trainY,
+  method = "gbm",
+  tuneGrid = gbmGrid,
+  trControl = ctrl,
+  verbose = FALSE)
+
+stopCluster(cl)
+
+# Model results
+plot(gbmTune)
+summary(gbmTune)
+varImp(gbmTune)
+
+modelPred <- predict(gbmTune, newdata=testX)
+
+modelValues <- data.frame(obs = testY, pred=modelPred)
+colnames(modelValues) = c('obs', 'pred')
+(gbm_values <- defaultSummary(modelValues))
+```
+
+
+#### Cubist
+
+```{r}
+set.seed(42424)
+
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
+
+## Create a specific candidate set of models to evaluate:
+cubGrid <- expand.grid(
+  .committees = c(1, 2, 4, 8, 16, 32, 64, 96),
+  .neighbors = c(0, 1, 5, 9)
+  )
+
+ctrl <- trainControl(method='cv', number=10)
+
+cubTune <- train(trainX, trainY,
+  method = "cubist",
+  tuneGrid = cubGrid)
+
+stopCluster(cl)
+
+# Model results
+plot(cubTune)
+summary(cubTune)
+varImp(cubTune)
+
+modelPred <- predict(cubTune, newdata=testX)
+
+modelValues <- data.frame(obs = testY, pred=modelPred)
+colnames(modelValues) = c('obs', 'pred')
+(cub_values <- defaultSummary(modelValues))
+```
+
+#### Summary
+
+```{r}
+(models_summary <- rbind(rf_values, gbm_values, cub_values))
+```
+
+### Part (B)
+
+Which predictors are most important in the optimal tree-based regression model? Do either the biological or process variables dominate the list? How do the top 10 important predictors compare to the top 10 predictors from the optimal linear and nonlinear models?
+
+> The optimal tree-base regression was Cubist (RMSE=11.12429 and $R^2$ = 0.6610).  There was a number of overlaps between the tree-based top features and those seen in Linear Regression and Nonlinear Regression, including: `ManufacturingProcess32`, `ManufacturingProcess17`, `BiologicalMaterial06`, `ManufacturingProcess13`, `ManufacturingProcess31`, `BiologicalMaterial03`, `ManufacturingProcess33`.  Note that the order of importance difference between the features found here vs the other approaches.
+
+### Part (C)
+
+Plot the optimal single tree with the distribution of yield in the terminal nodes. Does this view of the data provide additional knowledge about the biological or process predictors and their relationship with yield?
+
+> Note that Cubist was my winner which doesn't lend it's to printing a "tree" with terminal nodes.  After a bunch of fails, I gave up trying to print a pretty decision tree for my GBM model.  Instead, I'm going to train a simple CART model using rpart2 since I do know how to print a nice decision tree from that model.
+
+```{r fig.height=6, fig.width=10}
+library(rpart)
+library(rpart.plot)
+library(partykit)
+library(party)
+library(rattle)
+
+set.seed(42424)
+
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
+
+rpartControl <- trainControl(
+  method= "cv",
+  number=10
+)
+
+model <- train(trainX, trainY,
+              method="rpart2",
+              trControl = rpartControl,
+              tuneLength=10)
+
+stopCluster(cl)
+
+(model)
+
+fancyRpartPlot(model$finalModel,palettes="RdPu")
+
+```
+
+> From this chart, we can see the paths that lead to the highest (node #8, followed by node #10) and lowest yields (node #9 or node # 11).  This offers a simple way to identify optimal conditions based on the model.  Since we have no control over the Biological features, if we know those in advance, we can work backwards to identify which manufacturing settings (under our control), might lead to the best yield.  
