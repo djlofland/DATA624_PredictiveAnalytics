@@ -2668,13 +2668,13 @@ ManufacturingProcess41
 ## ManufacturingProcess20   34.31
 ## ManufacturingProcess29   34.04
 ## ManufacturingProcess15   33.15</code></pre>
-<div class="sourceCode" id="cb51"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1"></a>modelPred &lt;-<span class="st"> </span><span class="kw">predict</span>(nnetTune, <span class="dt">newdata=</span>trainX)</span>
+<div class="sourceCode" id="cb51"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1"></a>modelPred &lt;-<span class="st"> </span><span class="kw">predict</span>(nnetTune, <span class="dt">newdata=</span>testX)</span>
 <span id="cb51-2"><a href="#cb51-2"></a></span>
-<span id="cb51-3"><a href="#cb51-3"></a>modelValues &lt;-<span class="st"> </span><span class="kw">data.frame</span>(<span class="dt">obs =</span> trainY, <span class="dt">pred=</span>modelPred)</span>
+<span id="cb51-3"><a href="#cb51-3"></a>modelValues &lt;-<span class="st"> </span><span class="kw">data.frame</span>(<span class="dt">obs =</span> testY, <span class="dt">pred=</span>modelPred)</span>
 <span id="cb51-4"><a href="#cb51-4"></a><span class="kw">colnames</span>(modelValues) =<span class="st"> </span><span class="kw">c</span>(<span class="st">&#39;obs&#39;</span>, <span class="st">&#39;pred&#39;</span>)</span>
 <span id="cb51-5"><a href="#cb51-5"></a>(nnet_values &lt;-<span class="st"> </span><span class="kw">defaultSummary</span>(modelValues))</span></code></pre></div>
 <pre><code>##      RMSE  Rsquared       MAE 
-## 0.3379458 0.9669027 0.2408106</code></pre>
+## 1.2146853 0.6426541 0.8962163</code></pre>
 </div>
 <div id="mars-1" class="section level4">
 <h4>MARS</h4>
@@ -2716,13 +2716,13 @@ ManufacturingProcess41
 ##                        Overall
 ## ManufacturingProcess32     100
 ## ManufacturingProcess09       0</code></pre>
-<div class="sourceCode" id="cb58"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb58-1"><a href="#cb58-1"></a>modelPred &lt;-<span class="st"> </span><span class="kw">predict</span>(marsTune, <span class="dt">newdata=</span>trainX)</span>
+<div class="sourceCode" id="cb58"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb58-1"><a href="#cb58-1"></a>modelPred &lt;-<span class="st"> </span><span class="kw">predict</span>(marsTune, <span class="dt">newdata=</span>testX)</span>
 <span id="cb58-2"><a href="#cb58-2"></a></span>
-<span id="cb58-3"><a href="#cb58-3"></a>modelValues &lt;-<span class="st"> </span><span class="kw">data.frame</span>(<span class="dt">obs =</span> trainY, <span class="dt">pred=</span>modelPred)</span>
+<span id="cb58-3"><a href="#cb58-3"></a>modelValues &lt;-<span class="st"> </span><span class="kw">data.frame</span>(<span class="dt">obs =</span> testY, <span class="dt">pred=</span>modelPred)</span>
 <span id="cb58-4"><a href="#cb58-4"></a><span class="kw">colnames</span>(modelValues) =<span class="st"> </span><span class="kw">c</span>(<span class="st">&#39;obs&#39;</span>, <span class="st">&#39;pred&#39;</span>)</span>
 <span id="cb58-5"><a href="#cb58-5"></a>(mars_values &lt;-<span class="st"> </span><span class="kw">defaultSummary</span>(modelValues))</span></code></pre></div>
 <pre><code>##      RMSE  Rsquared       MAE 
-## 1.1295352 0.6039985 0.9187730</code></pre>
+## 1.3016929 0.5974956 1.0242889</code></pre>
 </div>
 <div id="svm-1" class="section level4">
 <h4>SVM</h4>
@@ -2770,13 +2770,13 @@ ManufacturingProcess41
 ## ManufacturingProcess20   34.31
 ## ManufacturingProcess29   34.04
 ## ManufacturingProcess15   33.15</code></pre>
-<div class="sourceCode" id="cb65"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb65-1"><a href="#cb65-1"></a>modelPred &lt;-<span class="st"> </span><span class="kw">predict</span>(svmRTune, <span class="dt">newdata=</span>trainX)</span>
+<div class="sourceCode" id="cb65"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb65-1"><a href="#cb65-1"></a>modelPred &lt;-<span class="st"> </span><span class="kw">predict</span>(svmRTune, <span class="dt">newdata=</span>testX)</span>
 <span id="cb65-2"><a href="#cb65-2"></a></span>
-<span id="cb65-3"><a href="#cb65-3"></a>modelValues &lt;-<span class="st"> </span><span class="kw">data.frame</span>(<span class="dt">obs =</span> trainY, <span class="dt">pred=</span>modelPred)</span>
+<span id="cb65-3"><a href="#cb65-3"></a>modelValues &lt;-<span class="st"> </span><span class="kw">data.frame</span>(<span class="dt">obs =</span> testY, <span class="dt">pred=</span>modelPred)</span>
 <span id="cb65-4"><a href="#cb65-4"></a><span class="kw">colnames</span>(modelValues) =<span class="st"> </span><span class="kw">c</span>(<span class="st">&#39;obs&#39;</span>, <span class="st">&#39;pred&#39;</span>)</span>
 <span id="cb65-5"><a href="#cb65-5"></a>(svm_values &lt;-<span class="st"> </span><span class="kw">defaultSummary</span>(modelValues))</span></code></pre></div>
-<pre><code>##      RMSE  Rsquared       MAE 
-## 0.1840081 0.9926642 0.1732115</code></pre>
+<pre><code>##     RMSE Rsquared      MAE 
+## 1.146482 0.713360 0.859768</code></pre>
 </div>
 <div id="knn-1" class="section level4">
 <h4>KNN</h4>
@@ -2833,24 +2833,24 @@ ManufacturingProcess41
 ## ManufacturingProcess20   34.31
 ## ManufacturingProcess29   34.04
 ## ManufacturingProcess15   33.15</code></pre>
-<div class="sourceCode" id="cb72"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb72-1"><a href="#cb72-1"></a>modelPred &lt;-<span class="st"> </span><span class="kw">predict</span>(knnTune, <span class="dt">newdata=</span>trainX)</span>
+<div class="sourceCode" id="cb72"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb72-1"><a href="#cb72-1"></a>modelPred &lt;-<span class="st"> </span><span class="kw">predict</span>(knnTune, <span class="dt">newdata=</span>testX)</span>
 <span id="cb72-2"><a href="#cb72-2"></a></span>
-<span id="cb72-3"><a href="#cb72-3"></a>modelValues &lt;-<span class="st"> </span><span class="kw">data.frame</span>(<span class="dt">obs =</span> trainY, <span class="dt">pred=</span>modelPred)</span>
+<span id="cb72-3"><a href="#cb72-3"></a>modelValues &lt;-<span class="st"> </span><span class="kw">data.frame</span>(<span class="dt">obs =</span> testY, <span class="dt">pred=</span>modelPred)</span>
 <span id="cb72-4"><a href="#cb72-4"></a><span class="kw">colnames</span>(modelValues) =<span class="st"> </span><span class="kw">c</span>(<span class="st">&#39;obs&#39;</span>, <span class="st">&#39;pred&#39;</span>)</span>
 <span id="cb72-5"><a href="#cb72-5"></a>(knn_values &lt;-<span class="st"> </span><span class="kw">defaultSummary</span>(modelValues))</span></code></pre></div>
 <pre><code>##      RMSE  Rsquared       MAE 
-## 0.7361890 0.8386371 0.5845255</code></pre>
+## 1.4621971 0.4875616 1.0596875</code></pre>
 </div>
 <div id="models-summary" class="section level4">
 <h4>Models Summary</h4>
 <div class="sourceCode" id="cb74"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb74-1"><a href="#cb74-1"></a>(models_summary &lt;-<span class="st"> </span><span class="kw">rbind</span>(nnet_values, mars_values, svm_values, knn_values))</span></code></pre></div>
-<pre><code>##                  RMSE  Rsquared       MAE
-## nnet_values 0.3379458 0.9669027 0.2408106
-## mars_values 1.1295352 0.6039985 0.9187730
-## svm_values  0.1840081 0.9926642 0.1732115
-## knn_values  0.7361890 0.8386371 0.5845255</code></pre>
+<pre><code>##                 RMSE  Rsquared       MAE
+## nnet_values 1.214685 0.6426541 0.8962163
+## mars_values 1.301693 0.5974956 1.0242889
+## svm_values  1.146482 0.7133600 0.8597680
+## knn_values  1.462197 0.4875616 1.0596875</code></pre>
 <blockquote>
-<p>NNET appears to provide the best RMSE and <span class="math inline">\(R^2\)</span> of the tuned models for NNET, MARS, SVM and KNN.</p>
+<p>MARS appears to provide the best RMSE and <span class="math inline">\(R^2\)</span> of the tuned models for NNET, MARS, SVM and KNN.</p>
 </blockquote>
 <ol start="2" style="list-style-type: lower-alpha">
 <li>Which predictors are most important in the optimal nonlinear regression model? Do either the biological or process variables dominate the list? How do the top ten important predictors compare to the top ten predictors from the optimal linear model?</li>

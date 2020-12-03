@@ -340,9 +340,9 @@ plot(nnetTune)
 summary(nnetTune)
 varImp(nnetTune)
 
-modelPred <- predict(nnetTune, newdata=trainX)
+modelPred <- predict(nnetTune, newdata=testX)
 
-modelValues <- data.frame(obs = trainY, pred=modelPred)
+modelValues <- data.frame(obs = testY, pred=modelPred)
 colnames(modelValues) = c('obs', 'pred')
 (nnet_values <- defaultSummary(modelValues))
 ```
@@ -370,9 +370,9 @@ plot(marsTune)
 summary(marsTune)
 varImp(marsTune)
 
-modelPred <- predict(marsTune, newdata=trainX)
+modelPred <- predict(marsTune, newdata=testX)
 
-modelValues <- data.frame(obs = trainY, pred=modelPred)
+modelValues <- data.frame(obs = testY, pred=modelPred)
 colnames(modelValues) = c('obs', 'pred')
 (mars_values <- defaultSummary(modelValues))
 ```
@@ -398,9 +398,9 @@ summary(svmRTune)
 
 varImp(svmRTune)
 
-modelPred <- predict(svmRTune, newdata=trainX)
+modelPred <- predict(svmRTune, newdata=testX)
 
-modelValues <- data.frame(obs = trainY, pred=modelPred)
+modelValues <- data.frame(obs = testY, pred=modelPred)
 colnames(modelValues) = c('obs', 'pred')
 (svm_values <- defaultSummary(modelValues))
 ```
@@ -428,9 +428,9 @@ summary(knnTune)
 
 varImp(knnTune)
 
-modelPred <- predict(knnTune, newdata=trainX)
+modelPred <- predict(knnTune, newdata=testX)
 
-modelValues <- data.frame(obs = trainY, pred=modelPred)
+modelValues <- data.frame(obs = testY, pred=modelPred)
 colnames(modelValues) = c('obs', 'pred')
 (knn_values <- defaultSummary(modelValues))
 ```
@@ -441,7 +441,7 @@ colnames(modelValues) = c('obs', 'pred')
 (models_summary <- rbind(nnet_values, mars_values, svm_values, knn_values))
 ```
 
-> NNET appears to provide the best RMSE and $R^2$ of the tuned models for NNET, MARS, SVM and KNN.
+> MARS appears to provide the best RMSE and $R^2$ of the tuned models for NNET, MARS, SVM and KNN.
 
 b. Which predictors are most important in the optimal nonlinear regression model? Do either the biological or process variables dominate the list? How do the top ten important predictors compare to the top ten predictors from the optimal linear model?
 
