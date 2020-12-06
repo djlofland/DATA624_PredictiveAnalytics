@@ -67,9 +67,8 @@ groceries_df <- groceries_df %>%
 print(paste(nrow(groceries_df), ncol(groceries_df)))
 
 # Since the data.frame has empty cells, we need to clean those out
-t2.long <- melt(groceries_df, id.vars="id")
-t2.long$variable <- NULL
-groceries_trans <- as(lapply(split(t2.long$value, t2.long$id), unique), "transactions")
+groceries_long <- melt(groceries_df, id.vars="id")
+groceries_trans <- as(lapply(split(groceries_long$value, groceries_long$id), unique), "transactions")
 
 # View first few baskets to make sure things look good
 inspect(groceries_trans[1:5])

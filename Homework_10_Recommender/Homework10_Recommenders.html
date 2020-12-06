@@ -1769,12 +1769,11 @@ div.tocify {
 <span id="cb1-17"><a href="#cb1-17"></a><span class="kw">print</span>(<span class="kw">paste</span>(<span class="kw">nrow</span>(groceries_df), <span class="kw">ncol</span>(groceries_df)))</span></code></pre></div>
 <pre><code>## [1] &quot;9835 33&quot;</code></pre>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1"></a><span class="co"># Since the data.frame has empty cells, we need to clean those out</span></span>
-<span id="cb3-2"><a href="#cb3-2"></a>t2.long &lt;-<span class="st"> </span><span class="kw">melt</span>(groceries_df, <span class="dt">id.vars=</span><span class="st">&quot;id&quot;</span>)</span>
-<span id="cb3-3"><a href="#cb3-3"></a>t2.long<span class="op">$</span>variable &lt;-<span class="st"> </span><span class="ot">NULL</span></span>
-<span id="cb3-4"><a href="#cb3-4"></a>groceries_trans &lt;-<span class="st"> </span><span class="kw">as</span>(<span class="kw">lapply</span>(<span class="kw">split</span>(t2.long<span class="op">$</span>value, t2.long<span class="op">$</span>id), unique), <span class="st">&quot;transactions&quot;</span>)</span>
-<span id="cb3-5"><a href="#cb3-5"></a></span>
-<span id="cb3-6"><a href="#cb3-6"></a><span class="co"># View first few baskets to make sure things look good</span></span>
-<span id="cb3-7"><a href="#cb3-7"></a><span class="kw">inspect</span>(groceries_trans[<span class="dv">1</span><span class="op">:</span><span class="dv">5</span>])</span></code></pre></div>
+<span id="cb3-2"><a href="#cb3-2"></a>groceries_long &lt;-<span class="st"> </span><span class="kw">melt</span>(groceries_df, <span class="dt">id.vars=</span><span class="st">&quot;id&quot;</span>)</span>
+<span id="cb3-3"><a href="#cb3-3"></a>groceries_trans &lt;-<span class="st"> </span><span class="kw">as</span>(<span class="kw">lapply</span>(<span class="kw">split</span>(groceries_long<span class="op">$</span>value, groceries_long<span class="op">$</span>id), unique), <span class="st">&quot;transactions&quot;</span>)</span>
+<span id="cb3-4"><a href="#cb3-4"></a></span>
+<span id="cb3-5"><a href="#cb3-5"></a><span class="co"># View first few baskets to make sure things look good</span></span>
+<span id="cb3-6"><a href="#cb3-6"></a><span class="kw">inspect</span>(groceries_trans[<span class="dv">1</span><span class="op">:</span><span class="dv">5</span>])</span></code></pre></div>
 <pre><code>##     items                      transactionID
 ## [1] {citrus fruit,                          
 ##      margarine,                             
